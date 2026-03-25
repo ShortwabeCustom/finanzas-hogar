@@ -1,0 +1,280 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── AUTHENTICATION ────────────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── USERS ─────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole  @default(VIEWER)
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts           Account[]
+  sessions           Session[]
+  payments           Payment[]
+  pantryItems        PantryItem[]
+  personalCategories PersonalCategory[]
+  personalPayments   PersonalPayment[]
+  personalCards      PersonalCard[]
+}
+
+// ─── CATEGORIES ────────────────────────────────────────────────────────────────
+
+enum CategoryType {
+  PAYMENT
+  PANTRY
+  BOTH
+}
+
+model Category {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  description String?
+  color       String       @default("#6366f1")
+  icon        String?
+  type        CategoryType @default(BOTH)
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  payments    Payment[]
+  pantryItems PantryItem[]
+}
+
+// ─── PAYMENTS ──────────────────────────────────────────────────────────────────
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  TRANSFER
+  CHECK
+  OTHER
+}
+
+enum Period {
+  ONCE
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  BIMONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  folio         String        @unique
+  name          String
+  concept       String
+  amount        Decimal       @db.Decimal(12, 2)
+  paymentDate   DateTime?
+  dueDate       DateTime?
+  period        Period        @default(MONTHLY)
+  status        PaymentStatus @default(PENDING)
+  paymentMethod PaymentMethod @default(CASH)
+  receipt       String?
+  comments      String?       @db.Text
+  registeredAt  DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  paidById String?
+  paidBy   User?    @relation(fields: [paidById], references: [id])
+
+  personalCardId String?
+  card           PersonalCard? @relation("SharedPaymentCard", fields: [personalCardId], references: [id], onDelete: SetNull)
+}
+
+// ─── PANTRY ────────────────────────────────────────────────────────────────────
+
+enum PantryUnit {
+  PCS
+  KG
+  G
+  L
+  ML
+  PKG
+  BOX
+  CAN
+  BOTTLE
+  DOZEN
+}
+
+model PantryItem {
+  id           String     @id @default(cuid())
+  name         String
+  quantity     Decimal    @db.Decimal(10, 3)
+  unit         PantryUnit @default(PCS)
+  minStock     Decimal    @db.Decimal(10, 3) @default(1)
+  price        Decimal?   @db.Decimal(10, 2)
+  purchaseDate DateTime?
+  expiryDate   DateTime?
+  comments     String?    @db.Text
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  addedById String?
+  addedBy   User?    @relation(fields: [addedById], references: [id])
+
+  purchaseHistory PantryPurchaseHistory[]
+}
+
+model PantryPurchaseHistory {
+  id                   String    @id @default(cuid())
+  pantryItemId         String
+  purchaseDate         DateTime
+  previousPurchaseDate DateTime?
+  daysElapsed          Int?
+  price                Decimal?  @db.Decimal(10, 2)
+  notes                String?   @db.Text
+  createdAt            DateTime  @default(now())
+
+  item PantryItem @relation(fields: [pantryItemId], references: [id], onDelete: Cascade)
+
+  @@index([pantryItemId])
+}
+
+// ─── PERSONAL FINANCES ─────────────────────────────────────────────────────────
+
+model PersonalCategory {
+  id          String       @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  color       String       @default("#6366f1")
+  type        CategoryType @default(PAYMENT)
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments PersonalPayment[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model PersonalPayment {
+  id             String        @id @default(cuid())
+  userId         String
+  folio          String        @unique
+  name           String
+  concept        String
+  amount         Decimal       @db.Decimal(12, 2)
+  categoryId     String
+  personalCardId String?
+  period         Period        @default(MONTHLY)
+  status         PaymentStatus @default(PENDING)
+  paymentMethod  PaymentMethod @default(CASH)
+  dueDate        DateTime?
+  paymentDate    DateTime?
+  notes          String?       @db.Text
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category PersonalCategory  @relation(fields: [categoryId], references: [id])
+  card     PersonalCard?     @relation(fields: [personalCardId], references: [id])
+
+  @@index([userId])
+  @@index([userId, status])
+}
+
+// ─── PERSONAL CARDS ────────────────────────────────────────────────────────────
+
+enum PaymentSourceType {
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_ACCOUNT
+}
+
+model PersonalCard {
+  id                String            @id @default(cuid())
+  userId            String
+  bankName          String
+  cardName          String
+  last4Digits       String
+  paymentSourceType PaymentSourceType @default(CREDIT_CARD)
+  closingDay        Int               @default(0)
+  dueDay            Int               @default(0)
+  active            Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments       PersonalPayment[]
+  sharedPayments Payment[]         @relation("SharedPaymentCard")
+
+  @@unique([userId, bankName, last4Digits, paymentSourceType])
+  @@index([userId])
+}
+
