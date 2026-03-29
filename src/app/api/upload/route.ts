@@ -13,9 +13,9 @@ export async function POST(req: NextRequest) {
 
   if (!file) return NextResponse.json({ error: "No se recibió archivo" }, { status: 400 });
 
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
   if (!allowedTypes.includes(file.type)) {
-    return NextResponse.json({ error: "Solo se permiten imágenes JPG, PNG o WebP" }, { status: 400 });
+    return NextResponse.json({ error: "Solo se permiten archivos JPG, PNG, WebP o PDF" }, { status: 400 });
   }
 
   const maxSize = 5 * 1024 * 1024; // 5MB

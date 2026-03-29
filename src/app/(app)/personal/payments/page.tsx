@@ -5,7 +5,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
-import Modal from "@/components/ui/Modal";
+import Sheet from "@/components/ui/Sheet";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { personalPaymentSchema, type PersonalPaymentInput } from "@/lib/validations";
@@ -40,6 +40,7 @@ interface PersonalPayment {
   dueDate: string | null;
   paymentDate: string | null;
   notes: string | null;
+  receipt: string | null;
   createdAt: string;
 }
 
@@ -56,7 +57,7 @@ function PaymentForm({
   onCancel,
   isEdit,
 }: {
-  defaultValues?: Partial<PersonalPaymentInput & { id: string }>;
+  defaultValues?: Partial<PersonalPaymentInput & { id: string; receipt?: string | null }>;
   categories: PersonalCategory[];
   cards: PersonalCard[];
   onSubmit: (data: PersonalPaymentInput) => Promise<void>;
@@ -67,6 +68,7 @@ function PaymentForm({
     register,
     handleSubmit,
     control,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<PersonalPaymentInput>({
     resolver: zodResolver(personalPaymentSchema) as any,
@@ -82,12 +84,45 @@ function PaymentForm({
       dueDate: defaultValues?.dueDate ? defaultValues.dueDate.slice(0, 10) : "",
       paymentDate: defaultValues?.paymentDate ? defaultValues.paymentDate.slice(0, 10) : "",
       notes: defaultValues?.notes ?? "",
+      receipt: defaultValues?.receipt ?? "",
     },
   });
 
   const paymentMethod = useWatch({ control, name: "paymentMethod" });
   const showCardField = CARD_METHODS.includes(paymentMethod);
   const activeCards = cards.filter((c) => c.active);
+
+  const [receiptUrl, setReceiptUrl] = useState<string>(defaultValues?.receipt ?? "");
+  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleFile = useCallback(async (file: File) => {
+    const allowed = ["image/jpeg", "image/png", "application/pdf"];
+    if (!allowed.includes(file.type)) {
+      setUploadError("Solo se permiten archivos JPG, PNG o PDF");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("El archivo no debe superar 5MB");
+      return;
+    }
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Error al subir");
+      setReceiptUrl(json.url);
+      setValue("receipt", json.url);
+    } catch (e: any) {
+      setUploadError(e.message);
+    } finally {
+      setUploading(false);
+    }
+  }, [setValue]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
@@ -172,6 +207,72 @@ function PaymentForm({
           <label className="label">Fecha de pago</label>
           <input className="input" type="date" {...register("paymentDate")} />
         </div>
+        {/* Comprobante upload */}
+        <div className="col-span-2">
+          <label className="label">Comprobante <span className="text-gray-400 font-normal">(Opcional)</span></label>
+          {receiptUrl ? (
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50">
+              {receiptUrl.endsWith(".pdf") ? (
+                <svg className="w-8 h-8 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              ) : (
+                <img src={receiptUrl} alt="Comprobante" className="w-10 h-10 object-cover rounded border border-gray-200" />
+              )}
+              <a href={receiptUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 hover:underline truncate flex-1">
+                {receiptUrl.split("/").pop()}
+              </a>
+              <button
+                type="button"
+                onClick={() => { setReceiptUrl(""); setValue("receipt", ""); }}
+                className="text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const file = e.dataTransfer.files[0];
+                if (file) handleFile(file);
+              }}
+              className={`relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 transition-colors cursor-pointer
+                ${dragOver ? "border-indigo-400 bg-indigo-50" : "border-gray-200 bg-gray-50 hover:border-indigo-300 hover:bg-indigo-50/40"}`}
+              onClick={() => document.getElementById("receipt-input")?.click()}
+            >
+              <input
+                id="receipt-input"
+                type="file"
+                accept=".jpg,.jpeg,.png,.pdf"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+              />
+              {uploading ? (
+                <svg className="w-6 h-6 text-indigo-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+              ) : (
+                <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+              )}
+              <p className="text-sm text-gray-500 text-center">
+                {uploading ? "Subiendo..." : <><span className="font-medium text-indigo-600">Selecciona</span> o arrastra tu archivo</>}
+              </p>
+              <p className="text-xs text-gray-400">PDF, JPG o PNG · Máx. 5MB</p>
+            </div>
+          )}
+          {uploadError && <p className="mt-1 text-xs text-red-600">{uploadError}</p>}
+          <input type="hidden" {...register("receipt")} />
+        </div>
+
         <div className="col-span-2">
           <label className="label">Notas</label>
           <textarea className="input" rows={2} placeholder="Notas opcionales..." {...register("notes")} />
@@ -399,11 +500,11 @@ export default function PersonalPaymentsPage() {
       </div>
 
       {/* Form Modal */}
-      <Modal
+      <Sheet
         open={showForm}
         onClose={() => { setShowForm(false); setEditing(null); setError(null); }}
         title={editing ? "Editar pago personal" : "Nuevo pago personal"}
-        size="lg"
+        size="md"
       >
         <PaymentForm
           defaultValues={editing ? { ...editing, amount: Number(editing.amount), personalCardId: editing.personalCardId ?? "" } as any : undefined}
@@ -413,7 +514,7 @@ export default function PersonalPaymentsPage() {
           onCancel={() => { setShowForm(false); setEditing(null); setError(null); }}
           isEdit={!!editing}
         />
-      </Modal>
+      </Sheet>
 
       {/* Delete Confirm */}
       <ConfirmDialog

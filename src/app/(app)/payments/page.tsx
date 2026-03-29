@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Header from "@/components/layout/Header";
-import Modal from "@/components/ui/Modal";
+import Sheet from "@/components/ui/Sheet";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import SearchInput from "@/components/ui/SearchInput";
 import PaymentForm from "@/components/payments/PaymentForm";
@@ -183,12 +183,12 @@ export default function PaymentsPage() {
         />
       )}
 
-      {/* Form modal */}
-      <Modal
+      {/* Form sheet */}
+      <Sheet
         open={showForm}
         onClose={() => { setShowForm(false); setEditingPayment(null); }}
         title={editingPayment ? "Editar pago" : "Nuevo pago"}
-        size="2xl"
+        size="lg"
       >
         <PaymentForm
           defaultValues={
@@ -214,7 +214,7 @@ export default function PaymentsPage() {
           onCancel={() => { setShowForm(false); setEditingPayment(null); }}
           isEdit={!!editingPayment}
         />
-      </Modal>
+      </Sheet>
 
       {/* Delete confirm */}
       <ConfirmDialog
@@ -227,22 +227,22 @@ export default function PaymentsPage() {
       />
 
       {/* Receipt preview */}
-      <Modal
+      <Sheet
         open={!!receiptPreview}
         onClose={() => setReceiptPreview(null)}
         title="Vista previa del comprobante"
-        size="lg"
+        size="md"
       >
         {receiptPreview && (
           <div className="p-4 flex justify-center">
             <img
               src={receiptPreview}
               alt="Comprobante"
-              className="max-w-full max-h-[70vh] rounded-lg object-contain"
+              className="max-w-full rounded-lg object-contain"
             />
           </div>
         )}
-      </Modal>
+      </Sheet>
     </div>
   );
 }

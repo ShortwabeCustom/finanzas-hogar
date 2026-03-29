@@ -101,6 +101,7 @@ export const personalPaymentSchema = z.object({
   dueDate: z.string().optional().nullable(),
   paymentDate: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  receipt: z.string().optional().nullable(),
 });
 
 export type PersonalPaymentInput = z.infer<typeof personalPaymentSchema>;

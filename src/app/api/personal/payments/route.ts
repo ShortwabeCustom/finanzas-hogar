@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
         dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
         paymentDate: parsed.data.paymentDate ? new Date(parsed.data.paymentDate) : null,
         notes: parsed.data.notes ?? null,
+        receipt: parsed.data.receipt ?? null,
       },
       include: { category: true, card: true },
     });

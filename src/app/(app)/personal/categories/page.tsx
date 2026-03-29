@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Header from "@/components/layout/Header";
-import Modal from "@/components/ui/Modal";
+import Sheet from "@/components/ui/Sheet";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { personalCategorySchema, type PersonalCategoryInput } from "@/lib/validations";
 
@@ -265,7 +265,7 @@ export default function PersonalCategoriesPage() {
       )}
 
       {/* Form Modal */}
-      <Modal
+      <Sheet
         open={showForm}
         onClose={() => { setShowForm(false); setEditing(null); setError(null); }}
         title={editing ? "Editar categoría" : "Nueva categoría personal"}
@@ -277,7 +277,7 @@ export default function PersonalCategoriesPage() {
           onCancel={() => { setShowForm(false); setEditing(null); setError(null); }}
           isEdit={!!editing}
         />
-      </Modal>
+      </Sheet>
 
       {/* Delete Confirm */}
       {deleting && deleting._count.payments === 0 && (

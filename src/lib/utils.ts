@@ -17,7 +17,10 @@ export function formatCurrency(amount: number | string): string {
 
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "—";
-  return format(new Date(date), "dd/MM/yyyy", { locale: es });
+  // Leer componentes UTC directamente del ISO string para evitar desplazamiento por zona horaria
+  const iso = typeof date === "string" ? date : date.toISOString();
+  const [year, month, day] = iso.slice(0, 10).split("-");
+  return `${day}/${month}/${year}`;
 }
 
 export function formatDatetime(date: Date | string | null | undefined): string {

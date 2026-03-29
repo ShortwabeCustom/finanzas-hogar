@@ -49,6 +49,8 @@ export default function PaymentForm({
 }: PaymentFormProps) {
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(defaultValues?.receipt ?? null);
+  const [dragOver, setDragOver] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [cards, setCards] = useState<PersonalCard[]>([]);
   const isInitialMount = useRef(true);
 
@@ -101,11 +103,24 @@ export default function PaymentForm({
     setValue("personalCardId", "");
   }, [paidById, paymentMethod, setValue]);
 
+  function handleFile(file: File) {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    if (!allowed.includes(file.type)) {
+      setFileError("Solo se permiten archivos JPG, PNG o PDF");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setFileError("El archivo no debe superar 5MB");
+      return;
+    }
+    setFileError(null);
+    setReceiptFile(file);
+    setPreviewUrl(file.type === "application/pdf" ? "__pdf__" : URL.createObjectURL(file));
+  }
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
-    setReceiptFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
+    if (file) handleFile(file);
   }
 
   async function handleFormSubmit(data: PaymentInput) {
@@ -239,18 +254,60 @@ export default function PaymentForm({
 
         {/* Comprobante */}
         <div className="col-span-2">
-          <label className="label">Comprobante (JPG / PNG)</label>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={handleFileChange}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-          />
-          {previewUrl && (
-            <div className="mt-2">
-              <img src={previewUrl} alt="Comprobante" className="max-h-40 rounded-lg border border-gray-200 object-contain" />
+          <label className="label">Comprobante <span className="text-gray-400 font-normal">(Opcional)</span></label>
+          {previewUrl ? (
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50">
+              {previewUrl === "__pdf__" ? (
+                <svg className="w-8 h-8 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              ) : (
+                <img src={previewUrl} alt="Comprobante" className="w-10 h-10 object-cover rounded border border-gray-200" />
+              )}
+              <span className="text-sm text-gray-600 truncate flex-1">
+                {receiptFile ? receiptFile.name : previewUrl.split("/").pop()}
+              </span>
+              {previewUrl !== "__pdf__" && !receiptFile && (
+                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 hover:underline whitespace-nowrap">
+                  Ver
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => { setPreviewUrl(null); setReceiptFile(null); setFileError(null); }}
+                className="text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+              onClick={() => document.getElementById("receipt-pair-input")?.click()}
+              className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 cursor-pointer transition-colors
+                ${dragOver ? "border-indigo-400 bg-indigo-50" : "border-gray-200 bg-gray-50 hover:border-indigo-300 hover:bg-indigo-50/40"}`}
+            >
+              <input
+                id="receipt-pair-input"
+                type="file"
+                accept=".jpg,.jpeg,.png,.pdf"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              <p className="text-sm text-gray-500 text-center">
+                <span className="font-medium text-indigo-600">Selecciona</span> o arrastra tu archivo
+              </p>
+              <p className="text-xs text-gray-400">PDF, JPG o PNG · Máx. 5MB</p>
             </div>
           )}
+          {fileError && <p className="mt-1 text-xs text-red-600">{fileError}</p>}
         </div>
 
         {/* Comentarios */}
