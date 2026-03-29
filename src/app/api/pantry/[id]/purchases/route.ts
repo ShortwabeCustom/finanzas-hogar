@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { productPurchaseSchema } from "@/lib/validations";
 
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -42,24 +43,33 @@ export async function POST(
   }
 
   const newDate = new Date(parsed.data.purchaseDate);
+  const purchasePrice = parsed.data.price ?? null;
 
-  const lastPurchase = await prisma.pantryPurchaseHistory.findFirst({
-    where: { pantryItemId: id },
+  // Find the chronological predecessor (most recent purchase BEFORE newDate)
+  const prevPurchase = await prisma.pantryPurchaseHistory.findFirst({
+    where: { pantryItemId: id, purchaseDate: { lt: newDate } },
     orderBy: { purchaseDate: "desc" },
   });
 
-  let previousPurchaseDate: Date | null = null;
-  let daysElapsed: number | null = null;
+  const previousPurchaseDate = prevPurchase ? prevPurchase.purchaseDate : null;
+  const daysElapsed = previousPurchaseDate
+    ? Math.round((newDate.getTime() - previousPurchaseDate.getTime()) / (1000 * 60 * 60 * 24))
+    : null;
 
-  if (lastPurchase) {
-    previousPurchaseDate = lastPurchase.purchaseDate;
-    const diffMs = newDate.getTime() - lastPurchase.purchaseDate.getTime();
-    daysElapsed = Math.round(diffMs / (1000 * 60 * 60 * 24));
-  }
+  // Also find if there's a successor (purchase that was previously referencing the predecessor)
+  // so we can update its previousPurchaseDate/daysElapsed
+  const nextPurchase = await prisma.pantryPurchaseHistory.findFirst({
+    where: { pantryItemId: id, purchaseDate: { gt: newDate } },
+    orderBy: { purchaseDate: "asc" },
+  });
 
-  const purchasePrice = parsed.data.price ?? null;
+  const latestPurchase = await prisma.pantryPurchaseHistory.findFirst({
+    where: { pantryItemId: id },
+    orderBy: { purchaseDate: "desc" },
+  });
+  const isNewest = !latestPurchase || newDate >= latestPurchase.purchaseDate;
 
-  const [purchase] = await prisma.$transaction([
+  const ops: any[] = [
     prisma.pantryPurchaseHistory.create({
       data: {
         pantryItemId: id,
@@ -70,15 +80,35 @@ export async function POST(
         notes: parsed.data.notes ?? null,
       },
     }),
-    // Sync purchaseDate and price on PantryItem
-    prisma.pantryItem.update({
-      where: { id },
-      data: {
-        purchaseDate: newDate,
-        ...(purchasePrice !== null ? { price: purchasePrice } : {}),
-      },
-    }),
-  ]);
+  ];
+
+  // Update successor's previousPurchaseDate and daysElapsed to point to newDate
+  if (nextPurchase) {
+    const newDaysForSuccessor = Math.round(
+      (nextPurchase.purchaseDate.getTime() - newDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    ops.push(
+      prisma.pantryPurchaseHistory.update({
+        where: { id: nextPurchase.id },
+        data: { previousPurchaseDate: newDate, daysElapsed: newDaysForSuccessor },
+      })
+    );
+  }
+
+  // Sync purchaseDate on PantryItem only if this is the newest purchase
+  if (isNewest) {
+    ops.push(
+      prisma.pantryItem.update({
+        where: { id },
+        data: {
+          purchaseDate: newDate,
+          ...(purchasePrice !== null ? { price: purchasePrice } : {}),
+        },
+      })
+    );
+  }
+
+  const [purchase] = await prisma.$transaction(ops);
 
   return NextResponse.json(purchase, { status: 201 });
 }

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Header from "@/components/layout/Header";
-import Modal from "@/components/ui/Modal";
+import Sheet from "@/components/ui/Sheet";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import SearchInput from "@/components/ui/SearchInput";
 import {
@@ -92,7 +92,11 @@ function NextRepurchaseCell({ metrics }: { metrics: ProductMetrics }) {
   return (
     <div>
       <div className="text-xs text-gray-700">
-        {new Date(metrics.nextPurchaseDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}
+        {(() => {
+          const months = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+          const [y, m, d] = metrics.nextPurchaseDate!.slice(0, 10).split("-").map(Number);
+          return `${String(d).padStart(2,"0")} ${months[m - 1]} ${y}`;
+        })()}
       </div>
       <div className="text-xs text-gray-400">{relStr}</div>
     </div>
@@ -186,26 +190,32 @@ function PurchaseForm({
   currentPrice,
   onSubmit,
   onCancel,
+  initialValues,
+  submitLabel = "Registrar compra",
+  description,
 }: {
   itemName: string;
   currentPrice: number | null;
   onSubmit: (data: ProductPurchaseInput) => Promise<void>;
   onCancel: () => void;
+  initialValues?: Partial<ProductPurchaseInput>;
+  submitLabel?: string;
+  description?: React.ReactNode;
 }) {
   const todayStr = new Date().toISOString().split("T")[0];
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ProductPurchaseInput>({
     resolver: zodResolver(productPurchaseSchema) as any,
     defaultValues: {
-      purchaseDate: todayStr,
-      price: currentPrice ?? undefined,
-      notes: "",
+      purchaseDate: initialValues?.purchaseDate ?? todayStr,
+      price: initialValues?.price ?? currentPrice ?? undefined,
+      notes: initialValues?.notes ?? "",
     },
   });
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
       <p className="text-sm text-gray-500">
-        Registrando compra para <span className="font-medium text-gray-800">{itemName}</span>
+        {description ?? <>Registrando compra para <span className="font-medium text-gray-800">{itemName}</span></>}
       </p>
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2">
@@ -236,7 +246,7 @@ function PurchaseForm({
       <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
         <button type="button" onClick={onCancel} className="btn-secondary">Cancelar</button>
         <button type="submit" className="btn-primary" disabled={isSubmitting}>
-          {isSubmitting ? "Guardando..." : "Registrar compra"}
+          {isSubmitting ? "Guardando..." : submitLabel}
         </button>
       </div>
     </form>
@@ -245,12 +255,19 @@ function PurchaseForm({
 
 // ─── HistoryModal ─────────────────────────────────────────────────────────────
 
-function HistoryModal({ item, onClose }: { item: PantryItem; onClose: () => void }) {
+function HistoryModal({ item, onClose, onRefresh }: { item: PantryItem; onClose: () => void; onRefresh: () => Promise<void> }) {
   const m = item.metrics;
+  const [editingPurchase, setEditingPurchase] = useState<PurchaseHistory | null>(null);
+  const [deletingPurchase, setDeletingPurchase] = useState<PurchaseHistory | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [editError, setEditError] = useState("");
 
   function fmtDate(iso: string | null) {
     if (!iso) return "—";
-    return new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+    // Leer los componentes UTC directamente del string para evitar desplazamiento por zona horaria
+    const months = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+    const [y, mo, d] = iso.slice(0, 10).split("-").map(Number);
+    return `${String(d).padStart(2,"0")} ${months[mo - 1]} ${y}`;
   }
 
   function daysUntilLabel(d: number | null) {
@@ -260,94 +277,193 @@ function HistoryModal({ item, onClose }: { item: PantryItem; onClose: () => void
     return `hace ${Math.abs(d)} día${Math.abs(d) === 1 ? "" : "s"}`;
   }
 
-  return (
-    <div className="p-6 space-y-4">
-      {/* Metrics */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-xs text-gray-500">Total compras registradas</p>
-          <p className="text-lg font-bold text-gray-900">{m.purchaseCount}</p>
-        </div>
-        <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-xs text-gray-500">Últ. reposición</p>
-          <p className="text-lg font-bold text-gray-900">
-            {m.lastDaysElapsed !== null ? `${m.lastDaysElapsed} días` : "—"}
-          </p>
-        </div>
-        <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-xs text-gray-500">Promedio de duración</p>
-          <p className="text-lg font-bold text-gray-900">
-            {m.avgDaysElapsed !== null ? `${m.avgDaysElapsed} días` : "—"}
-          </p>
-        </div>
-        <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-xs text-gray-500">Próxima recompra</p>
-          <p className="text-base font-bold text-gray-900">
-            {m.nextPurchaseDate ? fmtDate(m.nextPurchaseDate) : "—"}
-          </p>
-          {m.daysUntilNext !== null && (
-            <p className="text-xs text-gray-500">{daysUntilLabel(m.daysUntilNext)}</p>
-          )}
-        </div>
-      </div>
+  async function handleEditSave(data: ProductPurchaseInput) {
+    if (!editingPurchase) return;
+    setEditError("");
+    const res = await fetch(`/api/pantry/${item.id}/purchases/${editingPurchase.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setEditError(typeof body.error === "string" ? body.error : "Error al guardar");
+      return;
+    }
+    setEditingPurchase(null);
+    await onRefresh();
+  }
 
-      {/* History table */}
-      <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">Historial cronológico</h3>
-        {item.purchaseHistory.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">No hay compras registradas aún</p>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
-            <table className="w-full text-xs">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">#</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">Fecha compra</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">Precio</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">Compra anterior</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">Días transcurridos</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">Notas</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {item.purchaseHistory.map((h, idx) => (
-                  <tr key={h.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-2 text-gray-400">{item.purchaseHistory.length - idx}</td>
-                    <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{fmtDate(h.purchaseDate)}</td>
-                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
-                      {h.price != null
-                        ? `$${Number(h.price).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                        : <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">
-                      {h.previousPurchaseDate
-                        ? fmtDate(h.previousPurchaseDate)
-                        : <em className="text-gray-400">Primera compra</em>}
-                    </td>
-                    <td className="px-3 py-2">
-                      {h.daysElapsed !== null ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
-                          {h.daysElapsed} día{h.daysElapsed !== 1 ? "s" : ""}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-gray-500 max-w-[120px] truncate">
-                      {h.notes || <span className="text-gray-300">—</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+  async function handleDeleteConfirm() {
+    if (!deletingPurchase) return;
+    setDeleteLoading(true);
+    await fetch(`/api/pantry/${item.id}/purchases/${deletingPurchase.id}`, { method: "DELETE" });
+    setDeleteLoading(false);
+    setDeletingPurchase(null);
+    await onRefresh();
+  }
+
+  return (
+    <>
+      <div className={editingPurchase ? "flex h-full divide-x divide-gray-200" : undefined}>
+        {/* Edit panel - left side, visible when editing */}
+        {editingPurchase && (
+          <div className="w-64 shrink-0 flex flex-col overflow-y-auto">
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
+              <h3 className="text-sm font-semibold text-gray-700">Editar compra</h3>
+              <button
+                onClick={() => setEditingPurchase(null)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {editError && (
+              <p className="mx-4 mt-3 text-red-600 text-xs bg-red-50 px-3 py-2 rounded-lg">{editError}</p>
+            )}
+            <div className="flex-1 overflow-y-auto">
+              <PurchaseForm
+                itemName={item.name}
+                currentPrice={editingPurchase.price}
+                initialValues={{
+                  purchaseDate: editingPurchase.purchaseDate.slice(0, 10),
+                  price: editingPurchase.price ?? undefined,
+                  notes: editingPurchase.notes ?? "",
+                }}
+                submitLabel="Guardar cambios"
+                description={<>Editando compra del <span className="font-medium text-gray-800">{fmtDate(editingPurchase.purchaseDate)}</span></>}
+                onSubmit={handleEditSave}
+                onCancel={() => setEditingPurchase(null)}
+              />
+            </div>
           </div>
         )}
+
+        {/* Main history content */}
+        <div className={editingPurchase ? "flex-1 overflow-y-auto p-6 space-y-4 min-w-0" : "p-6 space-y-4"}>
+          {/* Metrics */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Total compras registradas</p>
+              <p className="text-lg font-bold text-gray-900">{m.purchaseCount}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Últ. reposición</p>
+              <p className="text-lg font-bold text-gray-900">
+                {m.lastDaysElapsed !== null ? `${m.lastDaysElapsed} días` : "—"}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Promedio de duración</p>
+              <p className="text-lg font-bold text-gray-900">
+                {m.avgDaysElapsed !== null ? `${m.avgDaysElapsed} días` : "—"}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Próxima recompra</p>
+              <p className="text-base font-bold text-gray-900">
+                {m.nextPurchaseDate ? fmtDate(m.nextPurchaseDate) : "—"}
+              </p>
+              {m.daysUntilNext !== null && (
+                <p className="text-xs text-gray-500">{daysUntilLabel(m.daysUntilNext)}</p>
+              )}
+            </div>
+          </div>
+
+          {/* History table */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Historial cronológico</h3>
+            {item.purchaseHistory.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No hay compras registradas aún</p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">#</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">Fecha compra</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">Precio</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">Compra anterior</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">Días transcurridos</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">Notas</th>
+                      <th className="px-2 py-2 w-16"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {item.purchaseHistory.map((h, idx) => (
+                      <tr key={h.id} className={`group hover:bg-gray-50 ${editingPurchase?.id === h.id ? "bg-blue-50" : ""}`}>
+                        <td className="px-3 py-2 text-gray-400">{item.purchaseHistory.length - idx}</td>
+                        <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{fmtDate(h.purchaseDate)}</td>
+                        <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
+                          {h.price != null
+                            ? `$${Number(h.price).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-gray-500 whitespace-nowrap">
+                          {h.previousPurchaseDate
+                            ? fmtDate(h.previousPurchaseDate)
+                            : <em className="text-gray-400">Primera compra</em>}
+                        </td>
+                        <td className="px-3 py-2">
+                          {h.daysElapsed !== null ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                              {h.daysElapsed} día{h.daysElapsed !== 1 ? "s" : ""}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-gray-500 max-w-[100px] truncate">
+                          {h.notes || <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-2 py-2">
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => { setEditError(""); setEditingPurchase(h); }}
+                              title="Editar"
+                              className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => setDeletingPurchase(h)}
+                              title="Eliminar"
+                              className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end">
+            <button onClick={onClose} className="btn-secondary">Cerrar</button>
+          </div>
+        </div>
       </div>
 
-      <div className="flex justify-end">
-        <button onClick={onClose} className="btn-secondary">Cerrar</button>
-      </div>
-    </div>
+      {/* Delete purchase confirm */}
+      <ConfirmDialog
+        open={!!deletingPurchase}
+        onClose={() => setDeletingPurchase(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Eliminar compra"
+        message={deletingPurchase ? `¿Eliminar la compra del ${fmtDate(deletingPurchase.purchaseDate)}?` : ""}
+        loading={deleteLoading}
+      />
+    </>
   );
 }
 
@@ -379,9 +495,11 @@ export default function PantryPage() {
     if (filterCategory) params.set("categoryId", filterCategory);
     if (filterAlert) params.set("alert", filterAlert);
     const res = await fetch(`/api/pantry?${params}`);
-    const data = await res.json();
-    setItems(Array.isArray(data) ? data : []);
+    const data: PantryItem[] = await res.json();
+    const list = Array.isArray(data) ? data : [];
+    setItems(list);
     setLoading(false);
+    return list;
   }, [search, filterCategory, filterAlert]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
@@ -610,8 +728,8 @@ export default function PantryPage() {
         </div>
       )}
 
-      {/* Add/Edit product modal */}
-      <Modal open={showForm} onClose={() => { setShowForm(false); setEditingItem(null); setFormError(""); }} title={editingItem ? "Editar producto" : "Agregar producto"} size="lg">
+      {/* Add/Edit product sheet */}
+      <Sheet open={showForm} onClose={() => { setShowForm(false); setEditingItem(null); setFormError(""); }} title={editingItem ? "Editar producto" : "Agregar producto"} size="md">
         {formError && (
           <p className="mx-6 mt-4 text-red-600 text-xs bg-red-50 px-3 py-2 rounded-lg">{formError}</p>
         )}
@@ -628,10 +746,10 @@ export default function PantryPage() {
           onCancel={() => { setShowForm(false); setEditingItem(null); setFormError(""); }}
           isEdit={!!editingItem}
         />
-      </Modal>
+      </Sheet>
 
-      {/* Register purchase modal */}
-      <Modal
+      {/* Register purchase sheet */}
+      <Sheet
         open={showPurchaseModal}
         onClose={() => { setShowPurchaseModal(false); setSelectedItem(null); }}
         title="Registrar compra"
@@ -648,19 +766,27 @@ export default function PantryPage() {
             onCancel={() => { setShowPurchaseModal(false); setSelectedItem(null); }}
           />
         )}
-      </Modal>
+      </Sheet>
 
-      {/* History modal */}
-      <Modal
+      {/* History sheet */}
+      <Sheet
         open={showHistoryModal}
         onClose={() => { setShowHistoryModal(false); setSelectedItem(null); }}
         title={selectedItem ? `Historial — ${selectedItem.name}` : "Historial"}
-        size="xl"
+        size="2xl"
       >
         {selectedItem && (
-          <HistoryModal item={selectedItem} onClose={() => { setShowHistoryModal(false); setSelectedItem(null); }} />
+          <HistoryModal
+            item={selectedItem}
+            onClose={() => { setShowHistoryModal(false); setSelectedItem(null); }}
+            onRefresh={async () => {
+              const list = await fetchItems();
+              const updated = list.find((i) => i.id === selectedItem.id);
+              if (updated) setSelectedItem(updated);
+            }}
+          />
         )}
-      </Modal>
+      </Sheet>
 
       {/* Delete confirm */}
       <ConfirmDialog

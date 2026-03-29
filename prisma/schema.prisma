@@ -172,8 +172,8 @@ model PantryItem {
   unit         PantryUnit @default(PCS)
   minStock     Decimal    @db.Decimal(10, 3) @default(1)
   price        Decimal?   @db.Decimal(10, 2)
-  purchaseDate DateTime?
-  expiryDate   DateTime?
+  purchaseDate DateTime? @db.Date
+  expiryDate   DateTime? @db.Date
   comments     String?    @db.Text
   active       Boolean    @default(true)
   createdAt    DateTime   @default(now())
@@ -191,8 +191,8 @@ model PantryItem {
 model PantryPurchaseHistory {
   id                   String    @id @default(cuid())
   pantryItemId         String
-  purchaseDate         DateTime
-  previousPurchaseDate DateTime?
+  purchaseDate         DateTime  @db.Date
+  previousPurchaseDate DateTime? @db.Date
   daysElapsed          Int?
   price                Decimal?  @db.Decimal(10, 2)
   notes                String?   @db.Text
@@ -238,6 +238,7 @@ model PersonalPayment {
   dueDate        DateTime?
   paymentDate    DateTime?
   notes          String?       @db.Text
+  receipt        String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 

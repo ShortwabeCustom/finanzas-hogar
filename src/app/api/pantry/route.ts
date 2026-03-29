@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { pantryItemSchema } from "@/lib/validations";
 import { computeMetrics } from "@/lib/productMetrics";
 
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -23,12 +24,25 @@ export async function GET(req: NextRequest) {
     include: {
       category: true,
       addedBy: { select: { id: true, name: true } },
-      purchaseHistory: { orderBy: { purchaseDate: "desc" } },
+      purchaseHistory: { orderBy: { purchaseDate: "asc" } },
     },
     orderBy: { name: "asc" },
   });
 
-  const withMetrics = items.map((i) => ({ ...i, metrics: computeMetrics(i.purchaseHistory) }));
+  const withMetrics = items.map((i) => {
+    // Recalculate previousPurchaseDate and daysElapsed based on actual chronological order
+    const recalculated = i.purchaseHistory.map((h, idx) => {
+      const prev = idx > 0 ? i.purchaseHistory[idx - 1] : null;
+      const prevDate = prev ? prev.purchaseDate : null;
+      const daysElapsed = prevDate
+        ? Math.round((new Date(h.purchaseDate).getTime() - new Date(prevDate).getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+      return { ...h, previousPurchaseDate: prevDate, daysElapsed };
+    });
+    // Return descending for display
+    const historyDesc = [...recalculated].reverse();
+    return { ...i, purchaseHistory: historyDesc, metrics: computeMetrics(recalculated) };
+  });
 
   if (alert === "low") {
     return NextResponse.json(withMetrics.filter((i) => Number(i.quantity) <= Number(i.minStock)));
@@ -55,6 +69,8 @@ export async function POST(req: NextRequest) {
 
   const data = parsed.data;
   try {
+    const purchaseDate = data.purchaseDate ? new Date(data.purchaseDate) : null;
+
     const item = await prisma.pantryItem.create({
       data: {
         name: data.name,
@@ -63,10 +79,23 @@ export async function POST(req: NextRequest) {
         unit: data.unit ?? "PCS",
         minStock: data.minStock ?? 1,
         price: data.price != null ? data.price : null,
-        purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : null,
+        purchaseDate,
         expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
         comments: data.comments ?? null,
         addedById: session.user.id,
+        ...(purchaseDate
+          ? {
+              purchaseHistory: {
+                create: {
+                  purchaseDate,
+                  previousPurchaseDate: null,
+                  daysElapsed: null,
+                  price: data.price != null ? data.price : null,
+                  notes: null,
+                },
+              },
+            }
+          : {}),
       },
       include: { category: true, addedBy: { select: { id: true, name: true } }, purchaseHistory: { orderBy: { purchaseDate: "desc" } } },
     });
