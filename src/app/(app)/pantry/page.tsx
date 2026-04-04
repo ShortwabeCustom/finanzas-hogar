@@ -122,7 +122,7 @@ function PantryForm({
   onCancel: () => void;
   isEdit?: boolean;
 }) {
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<PantryItemInput>({
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<PantryItemInput>({
     resolver: zodResolver(pantryItemSchema) as any,
     defaultValues: {
       name: defaultValues?.name ?? "",
@@ -132,6 +132,16 @@ function PantryForm({
       comments: defaultValues?.comments ?? "",
     },
   });
+
+  useEffect(() => {
+    reset({
+      name: defaultValues?.name ?? "",
+      categoryId: defaultValues?.categoryId ?? "",
+      price: defaultValues?.price ?? undefined,
+      purchaseDate: defaultValues?.purchaseDate ?? "",
+      comments: defaultValues?.comments ?? "",
+    });
+  }, [defaultValues, reset]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
@@ -203,7 +213,7 @@ function PurchaseForm({
   description?: React.ReactNode;
 }) {
   const todayStr = new Date().toISOString().split("T")[0];
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ProductPurchaseInput>({
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProductPurchaseInput>({
     resolver: zodResolver(productPurchaseSchema) as any,
     defaultValues: {
       purchaseDate: initialValues?.purchaseDate ?? todayStr,
@@ -211,6 +221,14 @@ function PurchaseForm({
       notes: initialValues?.notes ?? "",
     },
   });
+
+  useEffect(() => {
+    reset({
+      purchaseDate: initialValues?.purchaseDate ?? todayStr,
+      price: initialValues?.price ?? currentPrice ?? undefined,
+      notes: initialValues?.notes ?? "",
+    });
+  }, [initialValues, currentPrice, todayStr, reset]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">

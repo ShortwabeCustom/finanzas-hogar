@@ -9,6 +9,7 @@ import PaymentForm from "@/components/payments/PaymentForm";
 import PaymentTable, { type PaymentRow } from "@/components/payments/PaymentTable";
 import type { PaymentInput } from "@/lib/validations";
 import { PAYMENT_METHOD_LABELS } from "@/lib/utils";
+import { resolveReceiptUrl } from "@/lib/receipt";
 
 interface Category { id: string; name: string; color: string; }
 interface User { id: string; name: string | null; email: string; }
@@ -56,7 +57,7 @@ export default function PaymentsPage() {
   }, []);
 
   async function handleSubmit(data: PaymentInput, receiptFile?: File) {
-    let receiptUrl = editingPayment?.receipt ?? null;
+    let receiptUrl = resolveReceiptUrl(editingPayment?.receipt) ?? null;
 
     if (receiptFile) {
       const fd = new FormData();
@@ -235,11 +236,19 @@ export default function PaymentsPage() {
       >
         {receiptPreview && (
           <div className="p-4 flex justify-center">
-            <img
-              src={receiptPreview}
-              alt="Comprobante"
-              className="max-w-full rounded-lg object-contain"
-            />
+            {receiptPreview.toLowerCase().endsWith(".pdf") ? (
+              <iframe
+                src={receiptPreview}
+                className="w-full h-[80vh] rounded-lg border"
+                title="Comprobante PDF"
+              />
+            ) : (
+              <img
+                src={receiptPreview}
+                alt="Comprobante"
+                className="max-w-full rounded-lg object-contain"
+              />
+            )}
           </div>
         )}
       </Sheet>

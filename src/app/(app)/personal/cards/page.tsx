@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Header from "@/components/layout/Header";
-import Modal from "@/components/ui/Modal";
+import Sheet from "@/components/ui/Sheet";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { personalCardSchema, type PersonalCardInput } from "@/lib/validations";
 
@@ -66,6 +66,7 @@ function CardForm({
     handleSubmit,
     control,
     setValue,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<PersonalCardInput>({
     resolver: zodResolver(personalCardSchema) as any,
@@ -82,6 +83,18 @@ function CardForm({
 
   const sourceType = useWatch({ control, name: "paymentSourceType" });
   const showDayFields = sourceType === "CREDIT_CARD";
+
+  useEffect(() => {
+    reset({
+      bankName: defaultValues?.bankName ?? "",
+      cardName: defaultValues?.cardName ?? "",
+      last4Digits: defaultValues?.last4Digits ?? "",
+      paymentSourceType: defaultValues?.paymentSourceType ?? "CREDIT_CARD",
+      closingDay: (defaultValues?.closingDay as any) ?? "",
+      dueDay: (defaultValues?.dueDay as any) ?? "",
+      active: defaultValues?.active ?? true,
+    });
+  }, [defaultValues, reset]);
 
   // Reset closing/due day to 0 when not credit card
   useEffect(() => {
@@ -435,13 +448,13 @@ export default function PersonalCardsPage() {
         </div>
       )}
 
-      <Modal
+      <Sheet
         open={showForm}
         onClose={() => { setShowForm(false); setEditing(null); setError(null); }}
         title={editing
           ? `Editar — ${editing.bankName} •••• ${editing.last4Digits}`
           : "Nuevo medio de pago"}
-        size="sm"
+        size="md"
       >
         <CardForm
           defaultValues={editing ?? undefined}
@@ -449,7 +462,7 @@ export default function PersonalCardsPage() {
           onCancel={() => { setShowForm(false); setEditing(null); setError(null); }}
           isEdit={!!editing}
         />
-      </Modal>
+      </Sheet>
 
       <ConfirmDialog
         open={!!deleting}

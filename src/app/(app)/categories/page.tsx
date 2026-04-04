@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Header from "@/components/layout/Header";
-import Modal from "@/components/ui/Modal";
+import Sheet from "@/components/ui/Sheet";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { categorySchema, type CategoryInput } from "@/lib/validations";
 
@@ -30,6 +30,94 @@ interface Category {
   _count?: { payments: number; pantryItems: number };
 }
 
+function CategoryIcon({ name }: { name: string }) {
+  const n = String(name || "").toLowerCase();
+  if (n.includes("ahorro") || n.includes("invers")) {
+    return (
+      <svg className="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-2.21 0-4 1.12-4 2.5s1.79 2.5 4 2.5 4 1.12 4 2.5-1.79 2.5-4 2.5m0-10V6m0 12v-2m9-4a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    );
+  }
+  if (n.includes("aliment") || n.includes("despensa") || n.includes("comida") || n.includes("restaurante")) {
+    return (
+      <svg className="w-5 h-5 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 3v7M5 3v7M9 3v7M5 10h4M7 10v11M15 3c1.657 0 3 1.343 3 3v4h-6V6c0-1.657 1.343-3 3-3zM15 10v11" />
+      </svg>
+    );
+  }
+  if (n.includes("educ")) {
+    return (
+      <svg className="w-5 h-5 text-sky-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0l7-3.889V16L12 20l-7-4v-5.889L12 14z" />
+      </svg>
+    );
+  }
+  if (n.includes("entreten")) {
+    return (
+      <svg className="w-5 h-5 text-pink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-4.586-2.65A1 1 0 008.667 9.4v5.2a1 1 0 001.499.868l4.586-2.65a1 1 0 000-1.732z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    );
+  }
+  if (n.includes("hogar")) {
+    return (
+      <svg className="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 11l9-7 9 7M5 10v10h14V10" />
+      </svg>
+    );
+  }
+  if (n.includes("mascota")) {
+    return (
+      <svg className="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11a2 2 0 100-4 2 2 0 000 4zm6 0a2 2 0 100-4 2 2 0 000 4zM7 16c1.333-1 2.667-1.5 4-1.5s2.667.5 4 1.5M6 7a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm12 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
+      </svg>
+    );
+  }
+  if (n.includes("ropa")) {
+    return (
+      <svg className="w-5 h-5 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 3l2 4 3 1-2 13H5L3 8l3-1 2-4h8z" />
+      </svg>
+    );
+  }
+  if (n.includes("salud")) {
+    return (
+      <svg className="w-5 h-5 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21s-7-4.35-7-10a4 4 0 017-2.646A4 4 0 0119 11c0 5.65-7 10-7 10z" />
+      </svg>
+    );
+  }
+  if (n.includes("servicio") || n.includes("internet") || n.includes("luz") || n.includes("agua")) {
+    return (
+      <svg className="w-5 h-5 text-violet-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 9a4 4 0 015.656 0M6.343 6.172a8 8 0 0111.314 0M3.515 3.343a12 12 0 0116.97 0M12 20h.01" />
+      </svg>
+    );
+  }
+  if (n.includes("suscrip")) {
+    return (
+      <svg className="w-5 h-5 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16v10H4zM9 7V5h6v2" />
+      </svg>
+    );
+  }
+  if (n.includes("transporte") || n.includes("gasolina")) {
+    return (
+      <svg className="w-5 h-5 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 13l2-6h14l2 6M5 13h14v5H5zM7 18h.01M17 18h.01" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="4" strokeWidth={2} />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v2m0 16v2m10-10h-2M4 12H2m16.95 6.95l-1.414-1.414M6.464 6.464L5.05 5.05m13.9 0l-1.414 1.414M6.464 17.536L5.05 18.95" />
+    </svg>
+  );
+}
+
 function CategoryForm({
   defaultValues, onSubmit, onCancel, isEdit,
 }: {
@@ -38,7 +126,7 @@ function CategoryForm({
   onCancel: () => void;
   isEdit?: boolean;
 }) {
-  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<CategoryInput>({
+  const { register, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm<CategoryInput>({
     resolver: zodResolver(categorySchema) as any,
     defaultValues: {
       name: defaultValues?.name ?? "",
@@ -50,6 +138,16 @@ function CategoryForm({
   });
 
   const selectedColor = watch("color");
+
+  useEffect(() => {
+    reset({
+      name: defaultValues?.name ?? "",
+      description: defaultValues?.description ?? "",
+      color: defaultValues?.color ?? "#6366f1",
+      icon: defaultValues?.icon ?? "",
+      type: defaultValues?.type ?? "BOTH",
+    });
+  }, [defaultValues, reset]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
@@ -159,32 +257,51 @@ export default function CategoriesPage() {
       {loading ? (
         <div className="flex justify-center py-16"><div className="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full" /></div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {categories.map((cat) => (
-            <div key={cat.id} className="card p-5 flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: cat.color + "20" }}>
-                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: cat.color }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-semibold text-gray-900 truncate">{cat.name}</h3>
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full flex-shrink-0">
-                    {TYPE_LABELS[cat.type]}
+            <div key={cat.id} className="card p-5 group">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span
+                    className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
+                    style={{ backgroundColor: cat.color + "22", borderLeft: `4px solid ${cat.color}` }}
+                  >
+                    <CategoryIcon name={cat.name} />
                   </span>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm truncate">{cat.name}</p>
+                    <p className="text-xs text-gray-400">{TYPE_LABELS[cat.type] ?? cat.type}</p>
+                  </div>
                 </div>
-                {cat.description && <p className="text-sm text-gray-500 mt-0.5 truncate">{cat.description}</p>}
-                <div className="flex items-center gap-3 mt-3">
+              </div>
+
+              {cat.description && (
+                <p className="text-xs text-gray-500 mb-3 line-clamp-2">{cat.description}</p>
+              )}
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">
+                  {cat._count?.payments ?? 0} pago{(cat._count?.payments ?? 0) !== 1 ? "s" : ""} ·{" "}
+                  {cat._count?.pantryItems ?? 0} despensa
+                </span>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => { setEditingCat(cat); setShowForm(true); }}
-                    className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                    title="Editar"
                   >
-                    Editar
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
                   </button>
                   <button
                     onClick={() => setDeletingCat(cat)}
-                    className="text-xs text-red-500 hover:text-red-700 font-medium"
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    title="Desactivar"
                   >
-                    Desactivar
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -192,7 +309,7 @@ export default function CategoriesPage() {
           ))}
 
           {categories.length === 0 && (
-            <div className="col-span-3 text-center py-16 text-gray-400">
+            <div className="col-span-full text-center py-16 text-gray-400">
               <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
               </svg>
@@ -202,14 +319,14 @@ export default function CategoriesPage() {
         </div>
       )}
 
-      <Modal open={showForm} onClose={() => { setShowForm(false); setEditingCat(null); }} title={editingCat ? "Editar categoría" : "Nueva categoría"} size="md">
+      <Sheet open={showForm} onClose={() => { setShowForm(false); setEditingCat(null); }} title={editingCat ? "Editar categoría" : "Nueva categoría"} size="md">
         <CategoryForm
           defaultValues={editingCat ? { ...editingCat, type: editingCat.type as any } : undefined}
           onSubmit={handleSubmit}
           onCancel={() => { setShowForm(false); setEditingCat(null); }}
           isEdit={!!editingCat}
         />
-      </Modal>
+      </Sheet>
 
       <ConfirmDialog
         open={!!deletingCat}

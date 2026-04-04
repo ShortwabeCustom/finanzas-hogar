@@ -5,6 +5,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { paymentSchema, type PaymentInput } from "@/lib/validations";
 import { PERIOD_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/utils";
+import { resolveReceiptUrl } from "@/lib/receipt";
 
 interface Category { id: string; name: string; color: string; }
 interface User { id: string; name: string | null; email: string; }
@@ -47,8 +48,24 @@ export default function PaymentForm({
   onCancel,
   isEdit = false,
 }: PaymentFormProps) {
+  const buildFormValues = () => ({
+    name: defaultValues?.name ?? "",
+    concept: defaultValues?.concept ?? "",
+    categoryId: defaultValues?.categoryId ?? "",
+    amount: defaultValues?.amount ?? 0,
+    paymentDate: defaultValues?.paymentDate ?? "",
+    dueDate: defaultValues?.dueDate ?? "",
+    period: defaultValues?.period ?? "MONTHLY",
+    status: defaultValues?.status ?? "PENDING",
+    paymentMethod: defaultValues?.paymentMethod ?? "CASH",
+    paidById: defaultValues?.paidById ?? "",
+    personalCardId: defaultValues?.personalCardId ?? "",
+    receipt: resolveReceiptUrl(defaultValues?.receipt) ?? "",
+    comments: defaultValues?.comments ?? "",
+  });
+
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(defaultValues?.receipt ?? null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(resolveReceiptUrl(defaultValues?.receipt) ?? null);
   const [dragOver, setDragOver] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [cards, setCards] = useState<PersonalCard[]>([]);
@@ -60,23 +77,10 @@ export default function PaymentForm({
     formState: { errors, isSubmitting },
     control,
     setValue,
+    reset,
   } = useForm<PaymentInput>({
     resolver: zodResolver(paymentSchema) as any,
-    defaultValues: {
-      name: defaultValues?.name ?? "",
-      concept: defaultValues?.concept ?? "",
-      categoryId: defaultValues?.categoryId ?? "",
-      amount: defaultValues?.amount ?? 0,
-      paymentDate: defaultValues?.paymentDate ?? "",
-      dueDate: defaultValues?.dueDate ?? "",
-      period: defaultValues?.period ?? "MONTHLY",
-      status: defaultValues?.status ?? "PENDING",
-      paymentMethod: defaultValues?.paymentMethod ?? "CASH",
-      paidById: defaultValues?.paidById ?? "",
-      personalCardId: defaultValues?.personalCardId ?? "",
-      receipt: defaultValues?.receipt ?? "",
-      comments: defaultValues?.comments ?? "",
-    },
+    defaultValues: buildFormValues(),
   });
 
   const paymentMethod = useWatch({ control, name: "paymentMethod" });
@@ -84,6 +88,13 @@ export default function PaymentForm({
   const showCardField = CARD_METHODS.includes(paymentMethod) && !!paidById;
 
   // Fetch compatible cards when method or user changes
+  useEffect(() => {
+    reset(buildFormValues());
+    setReceiptFile(null);
+    setFileError(null);
+    setPreviewUrl(resolveReceiptUrl(defaultValues?.receipt) ?? null);
+  }, [defaultValues, reset]);
+
   useEffect(() => {
     if (!showCardField) {
       setCards([]);

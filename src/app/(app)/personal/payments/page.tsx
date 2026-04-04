@@ -69,6 +69,7 @@ function PaymentForm({
     handleSubmit,
     control,
     setValue,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<PersonalPaymentInput>({
     resolver: zodResolver(personalPaymentSchema) as any,
@@ -96,6 +97,25 @@ function PaymentForm({
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    reset({
+      name: defaultValues?.name ?? "",
+      concept: defaultValues?.concept ?? "",
+      categoryId: defaultValues?.categoryId ?? "",
+      amount: (defaultValues?.amount as any) ?? "",
+      period: (defaultValues?.period ?? "MONTHLY") as any,
+      status: (defaultValues?.status ?? "PENDING") as any,
+      paymentMethod: (defaultValues?.paymentMethod ?? "TRANSFER") as any,
+      personalCardId: defaultValues?.personalCardId ?? "",
+      dueDate: defaultValues?.dueDate ? defaultValues.dueDate.slice(0, 10) : "",
+      paymentDate: defaultValues?.paymentDate ? defaultValues.paymentDate.slice(0, 10) : "",
+      notes: defaultValues?.notes ?? "",
+      receipt: defaultValues?.receipt ?? "",
+    });
+    setReceiptUrl(defaultValues?.receipt ?? "");
+    setUploadError(null);
+  }, [defaultValues, reset]);
 
   const handleFile = useCallback(async (file: File) => {
     const allowed = ["image/jpeg", "image/png", "application/pdf"];

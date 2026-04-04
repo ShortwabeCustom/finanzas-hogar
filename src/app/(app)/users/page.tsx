@@ -34,7 +34,7 @@ function UserForm({
   onCancel: () => void;
   isEdit?: boolean;
 }) {
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<UserInput>({
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<UserInput>({
     resolver: zodResolver(userSchema) as any,
     defaultValues: {
       name: defaultValues?.name ?? "",
@@ -44,6 +44,16 @@ function UserForm({
       active: defaultValues?.active ?? true,
     },
   });
+
+  useEffect(() => {
+    reset({
+      name: defaultValues?.name ?? "",
+      email: defaultValues?.email ?? "",
+      password: "",
+      role: (defaultValues?.role as any) ?? "VIEWER",
+      active: defaultValues?.active ?? true,
+    });
+  }, [defaultValues, reset]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">

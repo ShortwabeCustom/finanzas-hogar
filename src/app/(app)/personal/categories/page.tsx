@@ -29,6 +29,96 @@ interface PersonalCategory {
   _count: { payments: number };
 }
 
+function CategoryIcon({ name }: { name: string }) {
+  const n = String(name || "").toLowerCase();
+
+  if (n.includes("ahorro") || n.includes("invers")) {
+    return (
+      <svg className="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-2.21 0-4 1.12-4 2.5s1.79 2.5 4 2.5 4 1.12 4 2.5-1.79 2.5-4 2.5m0-10V6m0 12v-2m9-4a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    );
+  }
+  if (n.includes("aliment") || n.includes("despensa") || n.includes("comida") || n.includes("restaurante")) {
+    return (
+      <svg className="w-5 h-5 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 3v7M5 3v7M9 3v7M5 10h4M7 10v11M15 3c1.657 0 3 1.343 3 3v4h-6V6c0-1.657 1.343-3 3-3zM15 10v11" />
+      </svg>
+    );
+  }
+  if (n.includes("educ")) {
+    return (
+      <svg className="w-5 h-5 text-sky-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0l7-3.889V16L12 20l-7-4v-5.889L12 14z" />
+      </svg>
+    );
+  }
+  if (n.includes("entreten")) {
+    return (
+      <svg className="w-5 h-5 text-pink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-4.586-2.65A1 1 0 008.667 9.4v5.2a1 1 0 001.499.868l4.586-2.65a1 1 0 000-1.732z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    );
+  }
+  if (n.includes("hogar")) {
+    return (
+      <svg className="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 11l9-7 9 7M5 10v10h14V10" />
+      </svg>
+    );
+  }
+  if (n.includes("ingres")) {
+    return (
+      <svg className="w-5 h-5 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17L17 7m0 0H9m8 0v8" />
+      </svg>
+    );
+  }
+  if (n.includes("deuda")) {
+    return (
+      <svg className="w-5 h-5 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636L5.636 18.364M5.636 5.636l12.728 12.728" />
+      </svg>
+    );
+  }
+  if (n.includes("salud")) {
+    return (
+      <svg className="w-5 h-5 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21s-7-4.35-7-10a4 4 0 017-2.646A4 4 0 0119 11c0 5.65-7 10-7 10z" />
+      </svg>
+    );
+  }
+  if (n.includes("servicio") || n.includes("internet") || n.includes("luz") || n.includes("agua")) {
+    return (
+      <svg className="w-5 h-5 text-violet-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 9a4 4 0 015.656 0M6.343 6.172a8 8 0 0111.314 0M3.515 3.343a12 12 0 0116.97 0M12 20h.01" />
+      </svg>
+    );
+  }
+  if (n.includes("suscrip")) {
+    return (
+      <svg className="w-5 h-5 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16v10H4zM9 7V5h6v2" />
+      </svg>
+    );
+  }
+  if (n.includes("transporte") || n.includes("gasolina")) {
+    return (
+      <svg className="w-5 h-5 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 13l2-6h14l2 6M5 13h14v5H5zM7 18h.01M17 18h.01" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="4" strokeWidth={2} />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v2m0 16v2m10-10h-2M4 12H2m16.95 6.95l-1.414-1.414M6.464 6.464L5.05 5.05m13.9 0l-1.414 1.414M6.464 17.536L5.05 18.95" />
+    </svg>
+  );
+}
+
 function CategoryForm({
   defaultValues,
   onSubmit,
@@ -45,6 +135,7 @@ function CategoryForm({
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<PersonalCategoryInput>({
     resolver: zodResolver(personalCategorySchema) as any,
@@ -58,6 +149,16 @@ function CategoryForm({
   });
 
   const selectedColor = watch("color");
+
+  useEffect(() => {
+    reset({
+      name: defaultValues?.name ?? "",
+      description: defaultValues?.description ?? "",
+      color: defaultValues?.color ?? "#6366f1",
+      type: (defaultValues?.type ?? "PAYMENT") as any,
+      active: defaultValues?.active ?? true,
+    });
+  }, [defaultValues, reset]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
@@ -220,9 +321,11 @@ export default function PersonalCategoriesPage() {
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <span
-                    className="w-10 h-10 rounded-xl flex-shrink-0"
+                    className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
                     style={{ backgroundColor: cat.color + "22", borderLeft: `4px solid ${cat.color}` }}
-                  />
+                  >
+                    <CategoryIcon name={cat.name} />
+                  </span>
                   <div>
                     <p className="font-semibold text-gray-900 text-sm">{cat.name}</p>
                     <p className="text-xs text-gray-400">{TYPE_LABELS[cat.type] ?? cat.type}</p>

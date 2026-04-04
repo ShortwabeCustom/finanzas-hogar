@@ -12,6 +12,7 @@ import {
 } from "@tanstack/react-table";
 import { formatCurrency, formatDate, STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/utils";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { resolveReceiptUrl } from "@/lib/receipt";
 
 export interface PaymentRow {
   id: string;
@@ -113,7 +114,10 @@ export default function PaymentTable({ data, onEdit, onDelete, onViewReceipt }: 
         <div className="flex items-center gap-1">
           {row.original.receipt && (
             <button
-              onClick={() => onViewReceipt(row.original.receipt!)}
+              onClick={() => {
+                const url = resolveReceiptUrl(row.original.receipt);
+                if (url) onViewReceipt(url);
+              }}
               className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
               title="Ver comprobante"
             >
