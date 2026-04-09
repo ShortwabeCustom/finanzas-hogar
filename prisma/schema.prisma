@@ -211,6 +211,7 @@ model PersonalCategory {
   name        String
   description String?
   color       String       @default("#6366f1")
+  icon        String?
   type        CategoryType @default(PAYMENT)
   active      Boolean      @default(true)
   createdAt   DateTime     @default(now())
@@ -278,4 +279,3 @@ model PersonalCard {
   @@unique([userId, bankName, last4Digits, paymentSourceType])
   @@index([userId])
 }
-

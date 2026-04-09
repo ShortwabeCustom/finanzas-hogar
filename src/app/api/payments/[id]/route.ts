@@ -5,11 +5,17 @@ import { prisma } from "@/lib/prisma";
 import { paymentSchema } from "@/lib/validations";
 
 const CARD_METHODS = ["CREDIT_CARD", "DEBIT_CARD", "TRANSFER"];
-const METHOD_TO_SOURCE: Record<string, string> = {
-  CREDIT_CARD: "CREDIT_CARD",
-  DEBIT_CARD: "DEBIT_CARD",
-  TRANSFER: "BANK_ACCOUNT",
+const METHOD_TO_ALLOWED_SOURCES: Record<string, string[]> = {
+  CREDIT_CARD: ["CREDIT_CARD"],
+  DEBIT_CARD: ["DEBIT_CARD"],
+  TRANSFER: ["BANK_ACCOUNT", "DEBIT_CARD"],
 };
+
+function normalizeOptionalId(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 async function validatePersonalCard(
   personalCardId: string | null | undefined,
@@ -26,8 +32,8 @@ async function validatePersonalCard(
   if (paidById && card.userId !== paidById) {
     return { resolvedCardId: null, error: "El medio de pago no pertenece al usuario seleccionado en 'Pagado por'" };
   }
-  const expectedType = METHOD_TO_SOURCE[paymentMethod];
-  if ((card as any).paymentSourceType !== expectedType) {
+  const allowedTypes = METHOD_TO_ALLOWED_SOURCES[paymentMethod] ?? [];
+  if (!allowedTypes.includes((card as any).paymentSourceType)) {
     return { resolvedCardId: null, error: "El tipo de medio de pago no es compatible con la forma de pago seleccionada" };
   }
   return { resolvedCardId: personalCardId };
@@ -59,10 +65,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const data = parsed.data;
 
+    const normalizedPaidById = normalizeOptionalId(data.paidById);
     const { resolvedCardId, error: cardError } = await validatePersonalCard(
       data.personalCardId,
       data.paymentMethod,
-      data.paidById
+      normalizedPaidById
     );
     if (cardError) return NextResponse.json({ error: cardError }, { status: 400 });
 
@@ -78,7 +85,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         period: data.period,
         status: data.status,
         paymentMethod: data.paymentMethod,
-        paidById: data.paidById ?? null,
+        paidById: normalizedPaidById,
         personalCardId: resolvedCardId,
         receipt: data.receipt ?? null,
         comments: data.comments ?? null,

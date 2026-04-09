@@ -31,13 +31,13 @@ const CARD_METHODS = ["CREDIT_CARD", "DEBIT_CARD", "TRANSFER"];
 const CARD_FIELD_LABELS: Record<string, string> = {
   CREDIT_CARD: "Tarjeta de crédito asociada",
   DEBIT_CARD: "Tarjeta de débito asociada",
-  TRANSFER: "Cuenta de transferencia asociada",
+  TRANSFER: "Cuenta o tarjeta de débito asociada",
 };
 
 const CARD_FIELD_EMPTY: Record<string, string> = {
   CREDIT_CARD: "El usuario no tiene tarjetas de crédito registradas.",
   DEBIT_CARD: "El usuario no tiene tarjetas de débito registradas.",
-  TRANSFER: "El usuario no tiene cuentas bancarias registradas.",
+  TRANSFER: "El usuario no tiene cuentas bancarias ni tarjetas de débito registradas.",
 };
 
 export default function PaymentForm({

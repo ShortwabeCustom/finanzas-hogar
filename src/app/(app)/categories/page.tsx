@@ -7,11 +7,15 @@ import Header from "@/components/layout/Header";
 import Sheet from "@/components/ui/Sheet";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { categorySchema, type CategoryInput } from "@/lib/validations";
+import {
+  CATEGORY_ICON_LIBRARY,
+  CATEGORY_PRESET_COLORS,
+  CategoryGlyph,
+  getCategoryIconTheme,
+  resolveCategoryIconId,
+} from "@/lib/category-visuals";
 
-const PRESET_COLORS = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#ef4444", "#f59e0b",
-  "#10b981", "#14b8a6", "#06b6d4", "#3b82f6", "#64748b",
-];
+const PRESET_COLORS = CATEGORY_PRESET_COLORS;
 
 const TYPE_LABELS: Record<string, string> = {
   PAYMENT: "Solo pagos",
@@ -30,92 +34,9 @@ interface Category {
   _count?: { payments: number; pantryItems: number };
 }
 
-function CategoryIcon({ name }: { name: string }) {
-  const n = String(name || "").toLowerCase();
-  if (n.includes("ahorro") || n.includes("invers")) {
-    return (
-      <svg className="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-2.21 0-4 1.12-4 2.5s1.79 2.5 4 2.5 4 1.12 4 2.5-1.79 2.5-4 2.5m0-10V6m0 12v-2m9-4a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    );
-  }
-  if (n.includes("aliment") || n.includes("despensa") || n.includes("comida") || n.includes("restaurante")) {
-    return (
-      <svg className="w-5 h-5 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 3v7M5 3v7M9 3v7M5 10h4M7 10v11M15 3c1.657 0 3 1.343 3 3v4h-6V6c0-1.657 1.343-3 3-3zM15 10v11" />
-      </svg>
-    );
-  }
-  if (n.includes("educ")) {
-    return (
-      <svg className="w-5 h-5 text-sky-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0l7-3.889V16L12 20l-7-4v-5.889L12 14z" />
-      </svg>
-    );
-  }
-  if (n.includes("entreten")) {
-    return (
-      <svg className="w-5 h-5 text-pink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-4.586-2.65A1 1 0 008.667 9.4v5.2a1 1 0 001.499.868l4.586-2.65a1 1 0 000-1.732z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    );
-  }
-  if (n.includes("hogar")) {
-    return (
-      <svg className="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 11l9-7 9 7M5 10v10h14V10" />
-      </svg>
-    );
-  }
-  if (n.includes("mascota")) {
-    return (
-      <svg className="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11a2 2 0 100-4 2 2 0 000 4zm6 0a2 2 0 100-4 2 2 0 000 4zM7 16c1.333-1 2.667-1.5 4-1.5s2.667.5 4 1.5M6 7a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm12 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
-      </svg>
-    );
-  }
-  if (n.includes("ropa")) {
-    return (
-      <svg className="w-5 h-5 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 3l2 4 3 1-2 13H5L3 8l3-1 2-4h8z" />
-      </svg>
-    );
-  }
-  if (n.includes("salud")) {
-    return (
-      <svg className="w-5 h-5 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21s-7-4.35-7-10a4 4 0 017-2.646A4 4 0 0119 11c0 5.65-7 10-7 10z" />
-      </svg>
-    );
-  }
-  if (n.includes("servicio") || n.includes("internet") || n.includes("luz") || n.includes("agua")) {
-    return (
-      <svg className="w-5 h-5 text-violet-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 9a4 4 0 015.656 0M6.343 6.172a8 8 0 0111.314 0M3.515 3.343a12 12 0 0116.97 0M12 20h.01" />
-      </svg>
-    );
-  }
-  if (n.includes("suscrip")) {
-    return (
-      <svg className="w-5 h-5 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16v10H4zM9 7V5h6v2" />
-      </svg>
-    );
-  }
-  if (n.includes("transporte") || n.includes("gasolina")) {
-    return (
-      <svg className="w-5 h-5 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 13l2-6h14l2 6M5 13h14v5H5zM7 18h.01M17 18h.01" />
-      </svg>
-    );
-  }
-  return (
-    <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="4" strokeWidth={2} />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v2m0 16v2m10-10h-2M4 12H2m16.95 6.95l-1.414-1.414M6.464 6.464L5.05 5.05m13.9 0l-1.414 1.414M6.464 17.536L5.05 18.95" />
-    </svg>
-  );
+function CategoryIcon({ name, icon }: { name: string; icon?: string | null }) {
+  const iconId = resolveCategoryIconId(icon, name);
+  return <CategoryGlyph iconId={iconId} className="w-5 h-5" />;
 }
 
 function CategoryForm({
@@ -138,6 +59,7 @@ function CategoryForm({
   });
 
   const selectedColor = watch("color");
+  const selectedIcon = watch("icon");
 
   useEffect(() => {
     reset({
@@ -188,6 +110,26 @@ function CategoryForm({
           />
         </div>
         {errors.color && <p className="mt-1 text-xs text-red-600">{errors.color.message}</p>}
+      </div>
+      <div>
+        <label className="label">Ícono</label>
+        <input type="hidden" {...register("icon")} />
+        <div className="grid grid-cols-8 gap-2">
+          {CATEGORY_ICON_LIBRARY.map((option) => {
+            const selected = selectedIcon === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                title={option.label}
+                onClick={() => setValue("icon", option.id, { shouldValidate: true })}
+                className={`h-9 w-9 rounded-lg border transition-all flex items-center justify-center ${selected ? "border-indigo-600 ring-2 ring-indigo-200" : "border-gray-200 hover:border-gray-300"}`}
+              >
+                <CategoryGlyph iconId={option.id} className="w-4 h-4 text-slate-700" />
+              </button>
+            );
+          })}
+        </div>
       </div>
       <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
         <button type="button" onClick={onCancel} className="btn-secondary" disabled={isSubmitting}>Cancelar</button>
@@ -264,9 +206,11 @@ export default function CategoriesPage() {
                 <div className="flex items-center gap-3 min-w-0">
                   <span
                     className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
-                    style={{ backgroundColor: cat.color + "22", borderLeft: `4px solid ${cat.color}` }}
+                    style={getCategoryIconTheme(cat.color).containerStyle}
                   >
-                    <CategoryIcon name={cat.name} />
+                    <span style={getCategoryIconTheme(cat.color).iconStyle}>
+                      <CategoryIcon name={cat.name} icon={cat.icon} />
+                    </span>
                   </span>
                   <div className="min-w-0">
                     <p className="font-semibold text-gray-900 text-sm truncate">{cat.name}</p>

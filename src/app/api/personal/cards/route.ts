@@ -5,10 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { personalCardSchema } from "@/lib/validations";
 
 // Maps PaymentMethod → PaymentSourceType filter
-const METHOD_TO_SOURCE: Record<string, string> = {
-  CREDIT_CARD: "CREDIT_CARD",
-  DEBIT_CARD: "DEBIT_CARD",
-  TRANSFER: "BANK_ACCOUNT",
+const METHOD_TO_SOURCE: Record<string, string[]> = {
+  CREDIT_CARD: ["CREDIT_CARD"],
+  DEBIT_CARD: ["DEBIT_CARD"],
+  TRANSFER: ["BANK_ACCOUNT", "DEBIT_CARD"],
 };
 
 export async function GET(req: NextRequest) {
@@ -21,13 +21,13 @@ export async function GET(req: NextRequest) {
     const targetUserId = searchParams.get("userId") ?? session.user.id;
     const activeOnly = searchParams.get("active") !== "false";
     const method = searchParams.get("method") ?? "";
-    const sourceType = METHOD_TO_SOURCE[method];
+    const sourceTypes = METHOD_TO_SOURCE[method];
 
     const cards = await prisma.personalCard.findMany({
       where: {
         userId: targetUserId,
         ...(activeOnly ? { active: true } : {}),
-        ...(sourceType ? { paymentSourceType: sourceType as any } : {}),
+        ...(sourceTypes ? { paymentSourceType: { in: sourceTypes as any } } : {}),
       },
       include: { _count: { select: { payments: true } } },
       orderBy: [{ bankName: "asc" }, { cardName: "asc" }],
