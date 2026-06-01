@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useLimpiarCampos } from "@/hooks/useLimpiarCampos";
 import Header from "@/components/layout/Header";
 import Sheet from "@/components/ui/Sheet";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -48,6 +49,12 @@ interface PersonalCard {
   _count: { payments: number };
 }
 
+const EMPTY_CARD_VALUES = {
+  bankName: "", cardName: "", last4Digits: "",
+  paymentSourceType: "CREDIT_CARD" as const,
+  closingDay: "" as any, dueDay: "" as any, active: true,
+};
+
 const ordinalDay = (d: number) => `${d}°`;
 
 function CardForm({
@@ -83,6 +90,8 @@ function CardForm({
 
   const sourceType = useWatch({ control, name: "paymentSourceType" });
   const showDayFields = sourceType === "CREDIT_CARD";
+
+  const limpiarCampos = useLimpiarCampos(reset, EMPTY_CARD_VALUES);
 
   useEffect(() => {
     reset({
@@ -182,6 +191,7 @@ function CardForm({
 
       <div className="flex gap-3 pt-2">
         <button type="button" onClick={onCancel} className="btn-secondary flex-1">Cancelar</button>
+        <button type="button" onClick={limpiarCampos} className="btn-secondary flex-1" disabled={isSubmitting}>Limpiar campos</button>
         <button type="submit" disabled={isSubmitting} className="btn-primary flex-1">
           {isSubmitting ? "Guardando..." : isEdit ? "Actualizar" : "Guardar"}
         </button>

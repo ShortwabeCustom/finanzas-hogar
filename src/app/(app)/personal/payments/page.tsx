@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useLimpiarCampos } from "@/hooks/useLimpiarCampos";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
 import Sheet from "@/components/ui/Sheet";
@@ -43,6 +44,13 @@ interface PersonalPayment {
   receipt: string | null;
   createdAt: string;
 }
+
+const EMPTY_PERSONAL_PAYMENT_VALUES = {
+  name: "", concept: "", categoryId: "", amount: "" as any,
+  period: "MONTHLY" as const, status: "PENDING" as const,
+  paymentMethod: "TRANSFER" as const, personalCardId: "",
+  dueDate: "", paymentDate: "", notes: "", receipt: "",
+};
 
 const PERIODS = ["ONCE","WEEKLY","BIWEEKLY","MONTHLY","BIMONTHLY","QUARTERLY","SEMIANNUAL","ANNUAL"] as const;
 const STATUSES = ["PENDING","PAID","OVERDUE","CANCELLED"] as const;
@@ -98,6 +106,12 @@ function PaymentForm({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  const limpiarCampos = useLimpiarCampos(reset, EMPTY_PERSONAL_PAYMENT_VALUES, [
+    () => setReceiptUrl(""),
+    () => setUploadError(null),
+    () => setDragOver(false),
+  ]);
+
   useEffect(() => {
     reset({
       name: defaultValues?.name ?? "",
@@ -146,13 +160,13 @@ function PaymentForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="col-span-full">
           <label className="label">Nombre *</label>
           <input className="input" placeholder="Ej: Netflix, Gym..." {...register("name")} />
           {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
         </div>
-        <div className="col-span-2">
+        <div className="col-span-full">
           <label className="label">Concepto *</label>
           <input className="input" placeholder="Descripción del pago..." {...register("concept")} />
           {errors.concept && <p className="mt-1 text-xs text-red-600">{errors.concept.message}</p>}
@@ -193,7 +207,7 @@ function PaymentForm({
 
         {/* Dynamic card selector — only for CREDIT_CARD, DEBIT_CARD, TRANSFER */}
         {showCardField && (
-          <div className="col-span-2">
+          <div className="col-span-full">
             <label className="label">Tarjeta asociada</label>
             {activeCards.length === 0 ? (
               <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-700 flex items-start gap-2">
@@ -219,16 +233,16 @@ function PaymentForm({
           </div>
         )}
 
-        <div>
+        <div className="col-span-full">
           <label className="label">Fecha de vencimiento</label>
           <input className="input" type="date" {...register("dueDate")} />
         </div>
-        <div>
+        <div className="col-span-full">
           <label className="label">Fecha de pago</label>
           <input className="input" type="date" {...register("paymentDate")} />
         </div>
         {/* Comprobante upload */}
-        <div className="col-span-2">
+        <div className="col-span-full">
           <label className="label">Comprobante <span className="text-gray-400 font-normal">(Opcional)</span></label>
           {receiptUrl ? (
             <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50">
@@ -293,15 +307,16 @@ function PaymentForm({
           <input type="hidden" {...register("receipt")} />
         </div>
 
-        <div className="col-span-2">
+        <div className="col-span-full">
           <label className="label">Notas</label>
           <textarea className="input" rows={2} placeholder="Notas opcionales..." {...register("notes")} />
         </div>
       </div>
 
-      <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onCancel} className="btn-secondary flex-1">Cancelar</button>
-        <button type="submit" disabled={isSubmitting} className="btn-primary flex-1">
+      <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-2">
+        <button type="button" onClick={onCancel} className="btn-secondary w-full sm:w-auto">Cancelar</button>
+        <button type="button" onClick={limpiarCampos} className="btn-secondary w-full sm:w-auto" disabled={isSubmitting}>Limpiar campos</button>
+        <button type="submit" disabled={isSubmitting} className="btn-primary w-full sm:w-auto">
           {isSubmitting ? "Guardando..." : isEdit ? "Actualizar" : "Crear pago"}
         </button>
       </div>
@@ -441,81 +456,136 @@ export default function PersonalPaymentsPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  <th className="px-4 py-3">Folio</th>
-                  <th className="px-4 py-3">Nombre</th>
-                  <th className="px-4 py-3">Categoría</th>
-                  <th className="px-4 py-3">Monto</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3">Forma / Tarjeta</th>
-                  <th className="px-4 py-3">Vencimiento</th>
-                  <th className="px-4 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {payments.map((p) => (
-                  <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs text-indigo-700 whitespace-nowrap">{p.folio}</td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">{p.name}</p>
-                      <p className="text-xs text-gray-400 truncate max-w-[160px]">{p.concept}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.category?.color }} />
-                        <span className="text-gray-600 whitespace-nowrap">{p.category?.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-semibold whitespace-nowrap">{formatCurrency(p.amount)}</td>
-                    <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
-                    <td className="px-4 py-3">
-                      <p className="text-gray-600 whitespace-nowrap">{PAYMENT_METHOD_LABELS[p.paymentMethod] ?? p.paymentMethod}</p>
-                      {p.card && (
-                        <p className="text-xs text-indigo-600 font-mono mt-0.5">
-                          {p.card.bankName} •••• {p.card.last4Digits}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(p.dueDate)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => { setEditing(p); setShowForm(true); }}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                          title="Editar"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => setDeleting(p)}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                          title="Eliminar"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
+          <>
+            {/* Mobile card list */}
+            <div className="sm:hidden divide-y divide-gray-100">
+              {payments.map((p) => (
+                <div key={p.id} className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 text-sm truncate">{p.name}</p>
+                      <p className="text-xs text-gray-400 truncate mt-0.5">{p.concept}</p>
+                    </div>
+                    <span className="font-semibold text-gray-900 text-sm flex-shrink-0">{formatCurrency(p.amount)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.category?.color }} />
+                      <span className="text-xs text-gray-500">{p.category?.name}</span>
+                    </div>
+                    <StatusBadge status={p.status} />
+                    {p.dueDate && (
+                      <span className="text-xs text-gray-400">Vence: {formatDate(p.dueDate)}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs text-indigo-600">{p.folio}</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => { setEditing(p); setShowForm(true); }}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                        title="Editar"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => setDeleting(p)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Eliminar"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-700">{payments.length} pago{payments.length !== 1 ? "s" : ""}</span>
+                <span className="font-bold text-gray-900 text-sm">{formatCurrency(total)}</span>
+              </div>
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-3">Folio</th>
+                    <th className="px-4 py-3">Nombre</th>
+                    <th className="px-4 py-3">Categoría</th>
+                    <th className="px-4 py-3">Monto</th>
+                    <th className="px-4 py-3">Estado</th>
+                    <th className="px-4 py-3">Forma / Tarjeta</th>
+                    <th className="px-4 py-3">Vencimiento</th>
+                    <th className="px-4 py-3">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-gray-50 border-t border-gray-200">
-                <tr>
-                  <td colSpan={3} className="px-4 py-3 text-sm font-semibold text-gray-700">
-                    {payments.length} pago{payments.length !== 1 ? "s" : ""}
-                  </td>
-                  <td className="px-4 py-3 font-bold text-gray-900">{formatCurrency(total)}</td>
-                  <td colSpan={4} />
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {payments.map((p) => (
+                    <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs text-indigo-700 whitespace-nowrap">{p.folio}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-900">{p.name}</p>
+                        <p className="text-xs text-gray-400 truncate max-w-[160px]">{p.concept}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.category?.color }} />
+                          <span className="text-gray-600 whitespace-nowrap">{p.category?.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-semibold whitespace-nowrap">{formatCurrency(p.amount)}</td>
+                      <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
+                      <td className="px-4 py-3">
+                        <p className="text-gray-600 whitespace-nowrap">{PAYMENT_METHOD_LABELS[p.paymentMethod] ?? p.paymentMethod}</p>
+                        {p.card && (
+                          <p className="text-xs text-indigo-600 font-mono mt-0.5">
+                            {p.card.bankName} •••• {p.card.last4Digits}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(p.dueDate)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => { setEditing(p); setShowForm(true); }}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                            title="Editar"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => setDeleting(p)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Eliminar"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-gray-50 border-t border-gray-200">
+                  <tr>
+                    <td colSpan={3} className="px-4 py-3 text-sm font-semibold text-gray-700">
+                      {payments.length} pago{payments.length !== 1 ? "s" : ""}
+                    </td>
+                    <td className="px-4 py-3 font-bold text-gray-900">{formatCurrency(total)}</td>
+                    <td colSpan={4} />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

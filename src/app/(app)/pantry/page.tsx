@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useLimpiarCampos } from "@/hooks/useLimpiarCampos";
 import Header from "@/components/layout/Header";
 import Sheet from "@/components/ui/Sheet";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -111,6 +112,10 @@ function AlertBadge({ item }: { item: PantryItem }) {
   return <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">OK</span>;
 }
 
+const EMPTY_PANTRY_ITEM_VALUES = {
+  name: "", categoryId: "", price: undefined as any, purchaseDate: "", comments: "",
+};
+
 // ─── PantryForm (existing) ────────────────────────────────────────────────────
 
 function PantryForm({
@@ -133,6 +138,8 @@ function PantryForm({
     },
   });
 
+  const limpiarCampos = useLimpiarCampos(reset, EMPTY_PANTRY_ITEM_VALUES);
+
   useEffect(() => {
     reset({
       name: defaultValues?.name ?? "",
@@ -145,8 +152,8 @@ function PantryForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="col-span-full">
           <label className="label">Producto *</label>
           <input className="input" placeholder="Ej: Arroz" {...register("name")} />
           {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
@@ -174,18 +181,19 @@ function PantryForm({
           </div>
           {errors.price && <p className="mt-1 text-xs text-red-600">{errors.price.message}</p>}
         </div>
-        <div className="col-span-2">
+        <div className="col-span-full">
           <label className="label">Fecha de compra</label>
           <input type="date" className="input" {...register("purchaseDate")} />
         </div>
-        <div className="col-span-2">
+        <div className="col-span-full">
           <label className="label">Comentarios</label>
           <textarea className="input resize-none" rows={2} {...register("comments")} />
         </div>
       </div>
-      <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-        <button type="button" onClick={onCancel} className="btn-secondary" disabled={isSubmitting}>Cancelar</button>
-        <button type="submit" className="btn-primary" disabled={isSubmitting}>
+      <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-2 border-t border-gray-100">
+        <button type="button" onClick={onCancel} className="btn-secondary w-full sm:w-auto" disabled={isSubmitting}>Cancelar</button>
+        <button type="button" onClick={limpiarCampos} className="btn-secondary w-full sm:w-auto" disabled={isSubmitting}>Limpiar campos</button>
+        <button type="submit" className="btn-primary w-full sm:w-auto" disabled={isSubmitting}>
           {isSubmitting ? "Guardando..." : isEdit ? "Actualizar" : "Agregar producto"}
         </button>
       </div>
@@ -222,6 +230,12 @@ function PurchaseForm({
     },
   });
 
+  const limpiarCampos = useLimpiarCampos(reset, {
+    purchaseDate: todayStr,
+    price: currentPrice ?? undefined,
+    notes: "",
+  });
+
   useEffect(() => {
     reset({
       purchaseDate: initialValues?.purchaseDate ?? todayStr,
@@ -235,13 +249,13 @@ function PurchaseForm({
       <p className="text-sm text-gray-500">
         {description ?? <>Registrando compra para <span className="font-medium text-gray-800">{itemName}</span></>}
       </p>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
+      <div className="space-y-4">
+        <div>
           <label className="label">Fecha de compra *</label>
           <input type="date" className="input" {...register("purchaseDate")} />
           {errors.purchaseDate && <p className="mt-1 text-xs text-red-600">{errors.purchaseDate.message}</p>}
         </div>
-        <div className="col-span-2">
+        <div>
           <label className="label">Precio</label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
@@ -256,14 +270,15 @@ function PurchaseForm({
           </div>
           {errors.price && <p className="mt-1 text-xs text-red-600">{errors.price.message as string}</p>}
         </div>
-        <div className="col-span-2">
+        <div>
           <label className="label">Notas</label>
           <textarea className="input resize-none" rows={2} placeholder="Opcional..." {...register("notes")} />
         </div>
       </div>
-      <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-        <button type="button" onClick={onCancel} className="btn-secondary">Cancelar</button>
-        <button type="submit" className="btn-primary" disabled={isSubmitting}>
+      <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-2 border-t border-gray-100">
+        <button type="button" onClick={onCancel} className="btn-secondary w-full sm:w-auto">Cancelar</button>
+        <button type="button" onClick={limpiarCampos} className="btn-secondary w-full sm:w-auto" disabled={isSubmitting}>Limpiar campos</button>
+        <button type="submit" className="btn-primary w-full sm:w-auto" disabled={isSubmitting}>
           {isSubmitting ? "Guardando..." : submitLabel}
         </button>
       </div>

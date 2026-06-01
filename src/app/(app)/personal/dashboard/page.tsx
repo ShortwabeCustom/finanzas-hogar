@@ -135,14 +135,19 @@ export default function PersonalDashboardPage() {
     totalCount = 0,
     pendingCount = 0,
     overdueCount = 0,
+    overdueTotal = 0,
+    pendingTotal = 0,
+    monthlyIncomeAvg = null,
     paidInRange = 0,
     receivedInRange = 0,
+    savingsInRange = 0,
     byCategory = [],
     byMethod = [],
     monthlyFlow = [],
     upcoming = [],
     recent = [],
   } = data ?? {};
+  const deudaTotal = overdueTotal + pendingTotal;
   const rangeMeta = buildRange();
 
   const methodData = byMethod.map((m: any) => ({
@@ -215,7 +220,7 @@ export default function PersonalDashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatCard
           title="Total pagos"
           value={totalCount}
@@ -229,6 +234,13 @@ export default function PersonalDashboardPage() {
           subtitle={`Pagos confirmados ${rangeMeta.label}`}
           iconBg="bg-green-100"
           icon={<svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+        />
+        <StatCard
+          title="Fondos disponibles"
+          value={formatCurrency(savingsInRange)}
+          subtitle={`Ahorros acumulados ${rangeMeta.label}`}
+          iconBg="bg-emerald-100"
+          icon={<svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
         />
         <StatCard
           title="Dinero recibido"
@@ -251,6 +263,55 @@ export default function PersonalDashboardPage() {
           iconBg="bg-red-100"
           icon={<svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>}
         />
+      </div>
+
+      {/* Deuda e Ingresos */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className={`card p-5 border-l-4 ${overdueTotal > 0 ? "border-l-red-500" : deudaTotal > 0 ? "border-l-amber-400" : "border-l-green-400"}`}>
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Deuda Total</p>
+              <p className={`text-2xl font-bold ${overdueTotal > 0 ? "text-red-600" : deudaTotal > 0 ? "text-amber-600" : "text-green-600"}`}>
+                {formatCurrency(deudaTotal)}
+              </p>
+              <div className="flex gap-4 mt-2">
+                <span className="text-xs text-red-500 font-medium">Vencida: {formatCurrency(overdueTotal)}</span>
+                <span className="text-xs text-amber-500 font-medium">Pendiente: {formatCurrency(pendingTotal)}</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Snapshot actual · todos los pagos activos</p>
+            </div>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ml-4 ${overdueTotal > 0 ? "bg-red-100" : deudaTotal > 0 ? "bg-amber-100" : "bg-green-100"}`}>
+              <svg className={`w-5 h-5 ${overdueTotal > 0 ? "text-red-600" : deudaTotal > 0 ? "text-amber-600" : "text-green-600"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-5 border-l-4 border-l-indigo-400">
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Ingreso Promedio Mensual</p>
+              <p className="text-2xl font-bold text-indigo-600">
+                {monthlyIncomeAvg !== null ? formatCurrency(monthlyIncomeAvg) : "Sin datos"}
+              </p>
+              {monthlyIncomeAvg !== null && deudaTotal > 0 && (
+                <p className="text-xs text-gray-500 mt-2">
+                  La deuda representa el <span className="font-semibold text-gray-700">{((deudaTotal / monthlyIncomeAvg) * 100).toFixed(0)}%</span> de un ingreso mensual
+                </p>
+              )}
+              {monthlyIncomeAvg === null && (
+                <p className="text-xs text-gray-400 mt-2">Registra ingresos en categorías como Sueldo, Depósito o Ingreso</p>
+              )}
+              <p className="text-xs text-gray-400 mt-1">Promedio de los últimos 3 meses</p>
+            </div>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ml-4 bg-indigo-100">
+              <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="card p-6">
@@ -322,26 +383,42 @@ export default function PersonalDashboardPage() {
       {/* Upcoming + Recent */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card p-6 lg:col-span-2">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Próximos vencimientos (7 días)</h2>
+          <h2 className="text-base font-semibold text-gray-900 mb-4">Próximos vencimientos (15 días)</h2>
           {upcoming.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center py-6">No hay vencimientos próximos</p>
+            <p className="text-gray-400 text-sm text-center py-6">No hay vencimientos próximos en los siguientes 15 días</p>
           ) : (
             <div className="space-y-3">
-              {upcoming.map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-100">
-                  <div className="flex items-center gap-3">
-                    <span className="w-2 h-2 rounded-full bg-amber-400" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                      <p className="text-xs text-gray-500">{p.category?.name}</p>
+              {upcoming.map((p: any) => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const due = new Date(p.dueDate);
+                due.setHours(0, 0, 0, 0);
+                const daysLeft = Math.round((due.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+                const urgency = daysLeft <= 2 ? "red" : daysLeft <= 5 ? "amber" : "green";
+                const colors = {
+                  red: { bg: "bg-red-50", border: "border-red-100", dot: "bg-red-400", badge: "bg-red-100 text-red-700", date: "text-red-700" },
+                  amber: { bg: "bg-amber-50", border: "border-amber-100", dot: "bg-amber-400", badge: "bg-amber-100 text-amber-700", date: "text-amber-700" },
+                  green: { bg: "bg-green-50", border: "border-green-100", dot: "bg-green-400", badge: "bg-green-100 text-green-700", date: "text-green-700" },
+                }[urgency];
+                return (
+                  <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg ${colors.bg} border ${colors.border}`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                        <p className="text-xs text-gray-500">{p.category?.name}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-gray-900">{formatCurrency(p.amount)}</p>
+                      <p className={`text-xs ${colors.date}`}>Vence: {formatDate(p.dueDate)}</p>
+                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${colors.badge}`}>
+                        {daysLeft === 0 ? "Hoy" : daysLeft === 1 ? "Mañana" : `${daysLeft} días`}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-gray-900">{formatCurrency(p.amount)}</p>
-                    <p className="text-xs text-amber-700">Vence: {formatDate(p.dueDate)}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

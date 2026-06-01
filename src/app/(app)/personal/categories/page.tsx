@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useLimpiarCampos } from "@/hooks/useLimpiarCampos";
 import Header from "@/components/layout/Header";
 import Sheet from "@/components/ui/Sheet";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -16,6 +17,11 @@ import {
 } from "@/lib/category-visuals";
 
 const PRESET_COLORS = CATEGORY_PRESET_COLORS;
+
+const EMPTY_PERSONAL_CATEGORY_VALUES = {
+  name: "", description: "", color: "#6366f1", icon: "",
+  type: "PAYMENT" as const, active: true,
+};
 
 const TYPE_LABELS: Record<string, string> = {
   PAYMENT: "Solo pagos",
@@ -71,6 +77,8 @@ function CategoryForm({
 
   const selectedColor = watch("color");
   const selectedIcon = watch("icon");
+
+  const limpiarCampos = useLimpiarCampos(reset, EMPTY_PERSONAL_CATEGORY_VALUES);
 
   useEffect(() => {
     reset({
@@ -151,6 +159,9 @@ function CategoryForm({
       <div className="flex gap-3 pt-2">
         <button type="button" onClick={onCancel} className="btn-secondary flex-1">
           Cancelar
+        </button>
+        <button type="button" onClick={limpiarCampos} className="btn-secondary flex-1" disabled={isSubmitting}>
+          Limpiar campos
         </button>
         <button type="submit" disabled={isSubmitting} className="btn-primary flex-1">
           {isSubmitting ? "Guardando..." : isEdit ? "Actualizar" : "Crear categoría"}

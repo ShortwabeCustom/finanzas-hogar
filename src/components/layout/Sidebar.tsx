@@ -96,14 +96,34 @@ const personalItems = [
       </svg>
     ),
   },
+  {
+    href: "/personal/statements",
+    label: "Estados de Cuenta",
+    icon: (
+      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/financial/recovery-plan",
+    label: "Plan de Recuperación",
+    icon: (
+      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+  },
 ];
 
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export default function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "ADMIN";
@@ -126,11 +146,12 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     <aside
       className={cn(
         "fixed inset-y-0 left-0 z-50 bg-indigo-900 text-white flex flex-col transition-all duration-200",
-        collapsed ? "w-16" : "w-64"
+        collapsed ? "w-16" : "w-64",
+        mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}
     >
       {/* Logo + toggle */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-indigo-800 min-h-[72px]">
+      <div className="flex items-center gap-3 px-4 py-5 border-b border-indigo-800 min-h-[72px] relative">
         <div className="w-8 h-8 bg-indigo-400 rounded-lg flex items-center justify-center flex-shrink-0">
           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
@@ -144,11 +165,22 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </div>
         )}
 
-        {/* Collapse toggle */}
+        {/* Mobile close button */}
+        <button
+          onClick={onMobileClose}
+          className="md:hidden flex items-center justify-center w-7 h-7 rounded-md text-indigo-300 hover:bg-indigo-700 hover:text-white transition-colors flex-shrink-0"
+          title="Cerrar menú"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        {/* Collapse toggle (desktop only) */}
         <button
           onClick={onToggle}
           className={cn(
-            "flex items-center justify-center w-7 h-7 rounded-md text-indigo-300 hover:bg-indigo-700 hover:text-white transition-colors flex-shrink-0",
+            "hidden md:flex items-center justify-center w-7 h-7 rounded-md text-indigo-300 hover:bg-indigo-700 hover:text-white transition-colors flex-shrink-0",
             collapsed && "mx-auto"
           )}
           title={collapsed ? "Expandir menú" : "Contraer menú"}
@@ -192,7 +224,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {/* Group items */}
         {(collapsed || groupOpen) &&
           groupItems.map((item) => (
-            <Link key={item.href} href={item.href} className={navLinkClass(item.href)} title={collapsed ? item.label : undefined}>
+            <Link key={item.href} href={item.href} className={navLinkClass(item.href)} title={collapsed ? item.label : undefined} onClick={onMobileClose}>
               {item.icon}
               {!collapsed && item.label}
             </Link>
@@ -225,7 +257,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {/* Personal items */}
         {(collapsed || personalGroupOpen) &&
           personalItems.map((item) => (
-            <Link key={item.href} href={item.href} className={navLinkClass(item.href)} title={collapsed ? item.label : undefined}>
+            <Link key={item.href} href={item.href} className={navLinkClass(item.href)} title={collapsed ? item.label : undefined} onClick={onMobileClose}>
               {item.icon}
               {!collapsed && item.label}
             </Link>
@@ -245,7 +277,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
               </div>
             )}
             {adminItems.map((item) => (
-              <Link key={item.href} href={item.href} className={navLinkClass(item.href)} title={collapsed ? item.label : undefined}>
+              <Link key={item.href} href={item.href} className={navLinkClass(item.href)} title={collapsed ? item.label : undefined} onClick={onMobileClose}>
                 {item.icon}
                 {!collapsed && item.label}
               </Link>

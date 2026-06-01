@@ -33,6 +33,27 @@ function isReceivedCategory(name: string): boolean {
   return n.includes("deposito") || n.includes("abono") || n.includes("transferencias recibidas");
 }
 
+function isSavingsCategory(name: string): boolean {
+  return normalizeText(name).includes("ahorro");
+}
+
+function isIncome(
+  financialClass: string | null | undefined,
+  type: string | null | undefined,
+  categoryName: string
+): boolean {
+  if (financialClass === "INCOME") return true;
+  if (financialClass === "EXPENSE" || financialClass === "TRANSFER" || financialClass === "SAVING") return false;
+  if (type === "INCOME") return true;
+  if (type === "EXPENSE" || type === "TRANSFER") return false;
+  const n = normalizeText(categoryName);
+  return (
+    n.includes("deposito") || n.includes("abono") || n.includes("transferencias recibidas") ||
+    n.includes("ingreso") || n.includes("sueldo") || n.includes("salario") ||
+    n.includes("nomina") || n.includes("cobro")
+  );
+}
+
 function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -75,7 +96,7 @@ export async function GET(req: NextRequest) {
     const granularity = granularityParam === "day" || granularityParam === "week" ? granularityParam : "month";
     const from = requestedFrom ? startOfDay(requestedFrom) : new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
     const to = requestedTo ? endOfDay(requestedTo) : new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
-    const next7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const next15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
     const allPayments = await prisma.personalPayment.findMany({
       where: { userId },
       include: { category: true },
@@ -90,11 +111,11 @@ export async function GET(req: NextRequest) {
     const totalCount = filteredPayments.length;
     const pendingCount = filteredPayments.filter((p) => p.status === "PENDING").length;
     const overdueCount = filteredPayments.filter((p) => p.status === "OVERDUE").length;
-    const upcoming = filteredPayments
-      .filter((p) => p.status === "PENDING" || p.status === "OVERDUE")
-      .filter((p) => !!p.dueDate && p.dueDate >= now && p.dueDate <= next7Days)
+    const upcoming = allPayments
+      .filter((p) => p.status === "PENDING")
+      .filter((p) => !!p.dueDate && p.dueDate >= now && p.dueDate <= next15Days)
       .sort((a, b) => (a.dueDate?.getTime() ?? 0) - (b.dueDate?.getTime() ?? 0))
-      .slice(0, 10);
+      .slice(0, 20);
     const recent = [...filteredPayments]
       .sort((a, b) => {
         const aDate = (a.paymentDate ?? a.createdAt).getTime();
@@ -103,12 +124,36 @@ export async function GET(req: NextRequest) {
       })
       .slice(0, 5);
 
+    // ─── Deuda total (snapshot global, no filtrada por periodo) ───────────────
+    const overdueTotal = allPayments
+      .filter((p) => p.status === "OVERDUE")
+      .reduce((s, p) => s + Number(p.amount ?? 0), 0);
+    const pendingTotal = allPayments
+      .filter((p) => p.status === "PENDING")
+      .reduce((s, p) => s + Number(p.amount ?? 0), 0);
+
+    // ─── Ingreso promedio mensual (últimos 3 meses) ────────────────────────────
+    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1, 0, 0, 0, 0);
+    const incomeByMonth = new Map<string, number>();
+    for (const p of allPayments) {
+      if (p.status !== "PAID") continue;
+      const effectiveDate = p.paymentDate ?? p.createdAt;
+      if (effectiveDate < threeMonthsAgo) continue;
+      if (!isIncome(p.financialClass, p.type, p.category?.name ?? "")) continue;
+      const key = monthKey(effectiveDate);
+      incomeByMonth.set(key, (incomeByMonth.get(key) ?? 0) + Number(p.amount ?? 0));
+    }
+    const monthlyIncomeAvg = incomeByMonth.size > 0
+      ? Array.from(incomeByMonth.values()).reduce((a, b) => a + b, 0) / incomeByMonth.size
+      : null;
+
     const categoryAgg = new Map<string, { total: number; count: number; color: string; received: boolean }>();
     const methodAgg = new Map<string, { total: number; count: number }>();
     const flowAgg = new Map<string, { label: string; spent: number; received: number }>();
 
     let paidInRange = 0;
     let receivedInRange = 0;
+    let savingsInRange = 0;
 
     if (granularity === "day") {
       const cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
@@ -139,9 +184,15 @@ export async function GET(req: NextRequest) {
       const categoryName = payment.category?.name ?? "Sin categoría";
       const categoryColor = payment.category?.color ?? "#6366f1";
       const received = isReceivedCategory(categoryName);
+      const savings = isSavingsCategory(categoryName);
 
-      paidInRange += amount;
-      if (received) receivedInRange += amount;
+      if (savings) {
+        savingsInRange += amount;
+      } else if (received) {
+        receivedInRange += amount;
+      } else {
+        paidInRange += amount;
+      }
 
       const catCurrent = categoryAgg.get(categoryName) ?? { total: 0, count: 0, color: categoryColor, received };
       catCurrent.total += amount;
@@ -165,7 +216,7 @@ export async function GET(req: NextRequest) {
       const row = flowAgg.get(key);
       if (row) {
         if (received) row.received += amount;
-        else row.spent += amount;
+        else if (!savings) row.spent += amount;
       }
     }
 
@@ -194,8 +245,12 @@ export async function GET(req: NextRequest) {
       totalCount,
       pendingCount,
       overdueCount,
+      overdueTotal,
+      pendingTotal,
+      monthlyIncomeAvg,
       paidInRange,
       receivedInRange,
+      savingsInRange,
       byCategory,
       byMethod,
       monthlyFlow,

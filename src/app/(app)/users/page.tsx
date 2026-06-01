@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useLimpiarCampos } from "@/hooks/useLimpiarCampos";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
@@ -19,6 +20,10 @@ interface User {
   active: boolean;
   createdAt: string;
 }
+
+const EMPTY_USER_VALUES = {
+  name: "", email: "", password: "", role: "VIEWER" as const, active: true,
+};
 
 const ROLE_COLORS: Record<string, string> = {
   ADMIN: "bg-purple-100 text-purple-800",
@@ -44,6 +49,8 @@ function UserForm({
       active: defaultValues?.active ?? true,
     },
   });
+
+  const limpiarCampos = useLimpiarCampos(reset, EMPTY_USER_VALUES);
 
   useEffect(() => {
     reset({
@@ -86,6 +93,7 @@ function UserForm({
       </div>
       <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
         <button type="button" onClick={onCancel} className="btn-secondary" disabled={isSubmitting}>Cancelar</button>
+        <button type="button" onClick={limpiarCampos} className="btn-secondary" disabled={isSubmitting}>Limpiar campos</button>
         <button type="submit" className="btn-primary" disabled={isSubmitting}>
           {isSubmitting ? "Guardando..." : isEdit ? "Actualizar usuario" : "Crear usuario"}
         </button>

@@ -63,13 +63,15 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts           Account[]
-  sessions           Session[]
-  payments           Payment[]
-  pantryItems        PantryItem[]
-  personalCategories PersonalCategory[]
-  personalPayments   PersonalPayment[]
-  personalCards      PersonalCard[]
+  accounts            Account[]
+  sessions            Session[]
+  payments            Payment[]
+  pantryItems         PantryItem[]
+  personalCategories  PersonalCategory[]
+  personalPayments    PersonalPayment[]
+  personalCards       PersonalCard[]
+  bankAccounts        BankAccount[]
+  financialSnapshots  FinancialSnapshot[]
 }
 
 // ─── CATEGORIES ────────────────────────────────────────────────────────────────
@@ -205,6 +207,13 @@ model PantryPurchaseHistory {
 
 // ─── PERSONAL FINANCES ─────────────────────────────────────────────────────────
 
+enum FinancialClass {
+  INCOME
+  EXPENSE
+  TRANSFER
+  SAVING
+}
+
 model PersonalCategory {
   id          String       @id @default(cuid())
   userId      String
@@ -238,10 +247,12 @@ model PersonalPayment {
   paymentMethod  PaymentMethod @default(CASH)
   dueDate        DateTime?
   paymentDate    DateTime?
-  notes          String?       @db.Text
+  notes          String?        @db.Text
   receipt        String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  type           String?
+  financialClass FinancialClass?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   category PersonalCategory  @relation(fields: [categoryId], references: [id])
@@ -278,4 +289,97 @@ model PersonalCard {
 
   @@unique([userId, bankName, last4Digits, paymentSourceType])
   @@index([userId])
+}
+
+// ─── FINANCIAL SNAPSHOTS ───────────────────────────────────────────────────────
+
+model FinancialSnapshot {
+  id              String   @id @default(cuid())
+  userId          String
+  date            DateTime @db.Date
+  score           Int?
+  scoreLabel      String?
+  financialStatus String
+  overdueTotal    Decimal  @db.Decimal(14, 2)
+  pendingTotal    Decimal  @db.Decimal(14, 2)
+  freeCashflow    Decimal? @db.Decimal(14, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+// ─── FINANCIAL DATA ────────────────────────────────────────────────────────────
+
+enum AccountType {
+  CHECKING
+  CREDIT
+}
+
+model BankAccount {
+  id            String      @id @default(cuid())
+  userId        String
+  bankName      String
+  productName   String
+  accountNumber String?
+  clabe         String?
+  cardNumber    String?
+  currency      String      @default("MXN")
+  type          AccountType
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  statements   BankStatement[]
+  transactions BankTransaction[]
+
+  @@unique([userId, bankName, productName, cardNumber])
+  @@index([userId])
+}
+
+model BankStatement {
+  id             String    @id @default(cuid())
+  accountId      String
+  periodStart    DateTime  @db.Date
+  periodEnd      DateTime  @db.Date
+  cutDate        DateTime? @db.Date
+  openingBalance Decimal?  @db.Decimal(14, 2)
+  closingBalance Decimal?  @db.Decimal(14, 2)
+  totalCharges   Decimal?  @db.Decimal(14, 2)
+  totalCredits   Decimal?  @db.Decimal(14, 2)
+  sourceFile     String?
+  importedAt     DateTime  @default(now())
+
+  account      BankAccount       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  transactions BankTransaction[]
+
+  @@unique([accountId, periodStart, periodEnd])
+  @@index([accountId])
+}
+
+model BankTransaction {
+  id              String   @id @default(cuid())
+  statementId     String
+  accountId       String
+  transactionDate DateTime @db.Date
+  description     String
+  reference       String?
+  chargeAmount    Decimal? @db.Decimal(14, 2)
+  creditAmount    Decimal? @db.Decimal(14, 2)
+  balance         Decimal? @db.Decimal(14, 2)
+  category        String?
+  rawOcrText      String?  @db.Text
+  txnHash         String?
+  createdAt       DateTime @default(now())
+
+  statement BankStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  account   BankAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([statementId, txnHash])
+  @@index([accountId])
+  @@index([statementId])
+  @@index([transactionDate])
 }

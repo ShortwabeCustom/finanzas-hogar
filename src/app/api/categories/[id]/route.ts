@@ -21,7 +21,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  if (session.user.role !== "ADMIN") return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
+  if (session.user.role === "VIEWER") return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
 
   const { id } = await params;
   await prisma.category.update({ where: { id }, data: { active: false } });

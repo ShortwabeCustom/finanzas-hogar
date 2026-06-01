@@ -25,6 +25,10 @@ function isReceivedCategory(name: string): boolean {
   return n.includes("deposito") || n.includes("abono") || n.includes("transferencias recibidas");
 }
 
+function isSavingsCategory(name: string): boolean {
+  return normalizeText(name).includes("ahorro");
+}
+
 function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -72,7 +76,7 @@ export async function GET(req: NextRequest) {
   const granularity = granularityParam === "day" || granularityParam === "week" ? granularityParam : "month";
   const from = requestedFrom ? startOfDay(requestedFrom) : new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
   const to = requestedTo ? endOfDay(requestedTo) : new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
-  const next7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const next15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
 
   const [
     allPayments,
@@ -91,12 +95,12 @@ export async function GET(req: NextRequest) {
       _sum: { amount: true },
       _count: true,
     }),
-    // Próximos vencimientos (7 días)
+    // Próximos vencimientos (15 días)
     prisma.payment.findMany({
-      where: { status: "PENDING", dueDate: { gte: now, lte: next7Days } },
+      where: { status: "PENDING", dueDate: { gte: now, lte: next15Days } },
       include: { category: true },
       orderBy: { dueDate: "asc" },
-      take: 10,
+      take: 20,
     }),
     // Despensa: stock bajo
     prisma.pantryItem.findMany({
@@ -105,7 +109,7 @@ export async function GET(req: NextRequest) {
     }).then((items) => items.filter((i) => Number(i.quantity) <= Number(i.minStock))),
     // Despensa: por vencer
     prisma.pantryItem.findMany({
-      where: { active: true, expiryDate: { lte: next7Days, gte: now } },
+      where: { active: true, expiryDate: { lte: next15Days, gte: now } },
       include: { category: true },
     }),
     // Últimos pagos (base)
@@ -135,6 +139,7 @@ export async function GET(req: NextRequest) {
 
   let paidTotal = 0;
   let receivedTotal = 0;
+  let savingsTotal = 0;
 
   if (granularity === "day") {
     const cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
@@ -165,9 +170,15 @@ export async function GET(req: NextRequest) {
     const categoryName = payment.category?.name ?? "Sin categoría";
     const categoryColor = payment.category?.color ?? "#6366f1";
     const received = isReceivedCategory(categoryName);
+    const savings = isSavingsCategory(categoryName);
 
-    paidTotal += amount;
-    if (received) receivedTotal += amount;
+    if (savings) {
+      savingsTotal += amount;
+    } else if (received) {
+      receivedTotal += amount;
+    } else {
+      paidTotal += amount;
+    }
 
     const catCurrent = categoryAgg.get(categoryName) ?? { amount: 0, count: 0, color: categoryColor, received };
     catCurrent.amount += amount;
@@ -191,7 +202,7 @@ export async function GET(req: NextRequest) {
     const monthRow = flowAgg.get(key);
     if (monthRow) {
       if (received) monthRow.received += amount;
-      else monthRow.spent += amount;
+      else if (!savings) monthRow.spent += amount;
     }
   }
 
@@ -223,6 +234,7 @@ export async function GET(req: NextRequest) {
       overduePayments,
       paidInRange: paidTotal,
       receivedInRange: receivedTotal,
+      savingsInRange: savingsTotal,
     },
     paymentsByCategory,
     paymentsByMethod,

@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { paymentSchema, type PaymentInput } from "@/lib/validations";
 import { PERIOD_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/utils";
 import { resolveReceiptUrl } from "@/lib/receipt";
+import { useLimpiarCampos } from "@/hooks/useLimpiarCampos";
 
 interface Category { id: string; name: string; color: string; }
 interface User { id: string; name: string | null; email: string; }
@@ -27,6 +28,13 @@ interface PaymentFormProps {
 }
 
 const CARD_METHODS = ["CREDIT_CARD", "DEBIT_CARD", "TRANSFER"];
+
+const EMPTY_PAYMENT_VALUES = {
+  name: "", concept: "", categoryId: "", amount: 0,
+  paymentDate: "", dueDate: "", period: "MONTHLY" as const,
+  status: "PENDING" as const, paymentMethod: "CASH" as const,
+  paidById: "", personalCardId: "", receipt: "", comments: "",
+};
 
 const CARD_FIELD_LABELS: Record<string, string> = {
   CREDIT_CARD: "Tarjeta de crédito asociada",
@@ -86,6 +94,12 @@ export default function PaymentForm({
   const paymentMethod = useWatch({ control, name: "paymentMethod" });
   const paidById = useWatch({ control, name: "paidById" });
   const showCardField = CARD_METHODS.includes(paymentMethod) && !!paidById;
+
+  const limpiarCampos = useLimpiarCampos(reset, EMPTY_PAYMENT_VALUES, [
+    () => setReceiptFile(null),
+    () => setPreviewUrl(null),
+    () => setFileError(null),
+  ]);
 
   // Fetch compatible cards when method or user changes
   useEffect(() => {
@@ -147,16 +161,16 @@ export default function PaymentForm({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Nombre */}
-        <div className="col-span-2">
+        <div className="col-span-full">
           <label className="label">Nombre / Descripción *</label>
           <input className="input" placeholder="Ej: Pago de luz" {...register("name")} />
           {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
         </div>
 
         {/* Concepto */}
-        <div className="col-span-2">
+        <div className="col-span-full">
           <label className="label">Concepto *</label>
           <input className="input" placeholder="Ej: Servicio eléctrico mes de marzo" {...register("concept")} />
           {errors.concept && <p className="mt-1 text-xs text-red-600">{errors.concept.message}</p>}
@@ -185,13 +199,13 @@ export default function PaymentForm({
         </div>
 
         {/* Fecha de pago */}
-        <div>
+        <div className="col-span-full">
           <label className="label">Fecha de pago</label>
           <input type="date" className="input" {...register("paymentDate")} />
         </div>
 
         {/* Fecha límite */}
-        <div>
+        <div className="col-span-full">
           <label className="label">Fecha límite</label>
           <input type="date" className="input" {...register("dueDate")} />
         </div>
@@ -240,7 +254,7 @@ export default function PaymentForm({
 
         {/* Medio de pago asociado (condicional) */}
         {showCardField && (
-          <div className="col-span-2">
+          <div className="col-span-full">
             <label className="label">{CARD_FIELD_LABELS[paymentMethod] ?? "Medio de pago asociado"}</label>
             {cards.length === 0 ? (
               <div className="mt-1 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-700">
@@ -264,7 +278,7 @@ export default function PaymentForm({
         )}
 
         {/* Comprobante */}
-        <div className="col-span-2">
+        <div className="col-span-full">
           <label className="label">Comprobante <span className="text-gray-400 font-normal">(Opcional)</span></label>
           {previewUrl ? (
             <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50">
@@ -322,7 +336,7 @@ export default function PaymentForm({
         </div>
 
         {/* Comentarios */}
-        <div className="col-span-2">
+        <div className="col-span-full">
           <label className="label">Comentarios</label>
           <textarea
             className="input resize-none"
@@ -333,11 +347,14 @@ export default function PaymentForm({
         </div>
       </div>
 
-      <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-        <button type="button" onClick={onCancel} className="btn-secondary" disabled={isSubmitting}>
+      <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-2 border-t border-gray-100">
+        <button type="button" onClick={onCancel} className="btn-secondary w-full sm:w-auto" disabled={isSubmitting}>
           Cancelar
         </button>
-        <button type="submit" className="btn-primary" disabled={isSubmitting}>
+        <button type="button" onClick={limpiarCampos} className="btn-secondary w-full sm:w-auto" disabled={isSubmitting}>
+          Limpiar campos
+        </button>
+        <button type="submit" className="btn-primary w-full sm:w-auto" disabled={isSubmitting}>
           {isSubmitting ? "Guardando..." : isEdit ? "Actualizar pago" : "Registrar pago"}
         </button>
       </div>

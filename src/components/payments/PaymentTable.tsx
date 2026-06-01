@@ -160,9 +160,81 @@ export default function PaymentTable({ data, onEdit, onDelete, onViewReceipt }: 
     initialState: { pagination: { pageSize: 15 } },
   });
 
+  const rows = table.getRowModel().rows;
+
   return (
     <div className="card overflow-hidden">
-      <div className="overflow-x-auto">
+      {/* ── Mobile card list ── */}
+      <div className="sm:hidden divide-y divide-gray-100">
+        {rows.length === 0 ? (
+          <p className="px-4 py-12 text-center text-gray-400 text-sm">No hay registros para mostrar</p>
+        ) : (
+          rows.map((row) => {
+            const p = row.original;
+            const receiptUrl = resolveReceiptUrl(p.receipt);
+            return (
+              <div key={row.id} className="p-4">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900 text-sm truncate">{p.name}</p>
+                    <p className="text-xs text-gray-400 truncate mt-0.5">{p.concept}</p>
+                  </div>
+                  <span className="font-semibold text-gray-900 text-sm flex-shrink-0">
+                    {formatCurrency(p.amount)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.category?.color }} />
+                    <span className="text-xs text-gray-500">{p.category?.name}</span>
+                  </div>
+                  <StatusBadge status={p.status} />
+                  {p.dueDate && (
+                    <span className="text-xs text-gray-400">Vence: {formatDate(p.dueDate)}</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs text-indigo-600">{p.folio}</span>
+                  <div className="flex items-center gap-1">
+                    {receiptUrl && (
+                      <button
+                        onClick={() => onViewReceipt(receiptUrl)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                        title="Ver comprobante"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => onEdit(p)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      title="Editar"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => onDelete(p)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      title="Eliminar"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* ── Desktop table ── */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             {table.getHeaderGroups().map((hg) => (
@@ -184,14 +256,14 @@ export default function PaymentTable({ data, onEdit, onDelete, onViewReceipt }: 
             ))}
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {table.getRowModel().rows.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-12 text-center text-gray-400">
                   No hay registros para mostrar
                 </td>
               </tr>
             ) : (
-              table.getRowModel().rows.map((row) => (
+              rows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50 transition-colors">
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-4 py-3">

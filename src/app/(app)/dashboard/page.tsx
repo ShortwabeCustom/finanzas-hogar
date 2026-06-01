@@ -156,10 +156,10 @@ export default function DashboardPage() {
       </div>
 
       <div className="card p-4">
-        <div className="flex flex-wrap gap-3 items-end">
-          <div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-3 items-end">
+          <div className="lg:w-44">
             <label className="label">Tiempo</label>
-            <select className="input w-44" value={timeFilter} onChange={(e) => setTimeFilter(e.target.value as any)}>
+            <select className="input w-full" value={timeFilter} onChange={(e) => setTimeFilter(e.target.value as any)}>
               <option value="day">Por día</option>
               <option value="week">Por semana</option>
               <option value="month">Por mes</option>
@@ -168,38 +168,38 @@ export default function DashboardPage() {
             </select>
           </div>
           {timeFilter === "day" && (
-            <div>
+            <div className="lg:w-44">
               <label className="label">Fecha</label>
-              <input type="date" className="input w-44" value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} />
+              <input type="date" className="input w-full" value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} />
             </div>
           )}
           {timeFilter === "month" && (
-            <div>
+            <div className="lg:w-44">
               <label className="label">Mes</label>
-              <input type="month" className="input w-44" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} />
+              <input type="month" className="input w-full" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} />
             </div>
           )}
           {timeFilter === "week" && (
-            <div>
+            <div className="lg:w-44">
               <label className="label">Semana</label>
-              <input type="week" className="input w-44" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} />
+              <input type="week" className="input w-full" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} />
             </div>
           )}
           {timeFilter === "year" && (
-            <div>
+            <div className="lg:w-32">
               <label className="label">Año</label>
-              <input type="number" className="input w-32" value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value) || new Date().getFullYear())} min={2020} max={2100} />
+              <input type="number" className="input w-full" value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value) || new Date().getFullYear())} min={2020} max={2100} />
             </div>
           )}
           {timeFilter === "range" && (
             <>
-              <div>
+              <div className="lg:w-44">
                 <label className="label">Desde</label>
-                <input type="date" className="input w-44" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+                <input type="date" className="input w-full" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
               </div>
-              <div>
+              <div className="lg:w-44">
                 <label className="label">Hasta</label>
-                <input type="date" className="input w-44" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+                <input type="date" className="input w-full" value={toDate} onChange={(e) => setToDate(e.target.value)} />
               </div>
             </>
           )}
@@ -207,7 +207,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatCard
           title="Total de pagos"
           value={summary.totalPayments}
@@ -221,6 +221,13 @@ export default function DashboardPage() {
           subtitle={`Pagos completados ${rangeMeta.label}`}
           iconBg="bg-green-100"
           icon={<svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+        />
+        <StatCard
+          title="Fondos disponibles"
+          value={formatCurrency(summary.savingsInRange)}
+          subtitle={`Ahorros acumulados ${rangeMeta.label}`}
+          iconBg="bg-emerald-100"
+          icon={<svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
         />
         <StatCard
           title="Dinero recibido"
@@ -317,26 +324,42 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Próximos vencimientos */}
         <div className="card p-6 lg:col-span-2">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Próximos vencimientos (7 días)</h2>
+          <h2 className="text-base font-semibold text-gray-900 mb-4">Próximos vencimientos (15 días)</h2>
           {upcomingDue.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center py-6">No hay vencimientos próximos</p>
+            <p className="text-gray-400 text-sm text-center py-6">No hay vencimientos próximos en los siguientes 15 días</p>
           ) : (
             <div className="space-y-3">
-              {upcomingDue.map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-100">
-                  <div className="flex items-center gap-3">
-                    <span className="w-2 h-2 rounded-full bg-amber-400" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                      <p className="text-xs text-gray-500">{p.category?.name}</p>
+              {upcomingDue.map((p: any) => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const due = new Date(p.dueDate);
+                due.setHours(0, 0, 0, 0);
+                const daysLeft = Math.round((due.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+                const urgency = daysLeft <= 2 ? "red" : daysLeft <= 5 ? "amber" : "green";
+                const colors = {
+                  red: { bg: "bg-red-50", border: "border-red-100", dot: "bg-red-400", badge: "bg-red-100 text-red-700", date: "text-red-700" },
+                  amber: { bg: "bg-amber-50", border: "border-amber-100", dot: "bg-amber-400", badge: "bg-amber-100 text-amber-700", date: "text-amber-700" },
+                  green: { bg: "bg-green-50", border: "border-green-100", dot: "bg-green-400", badge: "bg-green-100 text-green-700", date: "text-green-700" },
+                }[urgency];
+                return (
+                  <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg ${colors.bg} border ${colors.border}`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                        <p className="text-xs text-gray-500">{p.category?.name}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-gray-900">{formatCurrency(p.amount)}</p>
+                      <p className={`text-xs ${colors.date}`}>Vence: {formatDate(p.dueDate)}</p>
+                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${colors.badge}`}>
+                        {daysLeft === 0 ? "Hoy" : daysLeft === 1 ? "Mañana" : `${daysLeft} días`}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-gray-900">{formatCurrency(p.amount)}</p>
-                    <p className="text-xs text-amber-700">Vence: {formatDate(p.dueDate)}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -381,7 +404,30 @@ export default function DashboardPage() {
       {/* Recent payments */}
       <div className="card p-6">
         <h2 className="text-base font-semibold text-gray-900 mb-4">Últimos pagos registrados</h2>
-        <div className="overflow-x-auto">
+
+        {/* Mobile cards */}
+        <div className="sm:hidden divide-y divide-gray-100 -mx-6">
+          {recentPayments.map((p: any) => (
+            <div key={p.id} className="px-6 py-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-900 text-sm truncate">{p.name}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.category?.color }} />
+                    <span className="text-xs text-gray-500">{p.category?.name}</span>
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="font-semibold text-sm text-gray-900">{formatCurrency(p.amount)}</p>
+                  <StatusBadge status={p.status} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">

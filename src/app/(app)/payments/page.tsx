@@ -124,21 +124,21 @@ export default function PaymentsPage() {
 
       {/* Filters */}
       <div className="card p-4 mb-4">
-        <div className="flex flex-wrap gap-3 items-end">
-          <div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-3 items-end">
+          <div className="sm:col-span-2 lg:col-auto">
             <label className="label">Buscar</label>
             <SearchInput value={search} onChange={setSearch} placeholder="Folio, nombre o concepto..." />
           </div>
           <div>
             <label className="label">Categoría</label>
-            <select className="input w-44" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+            <select className="input w-full lg:w-44" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
               <option value="">Todas</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div>
             <label className="label">Estado</label>
-            <select className="input w-40" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <select className="input w-full lg:w-40" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
               <option value="">Todos</option>
               <option value="PENDING">Pendiente</option>
               <option value="PAID">Pagado</option>
@@ -148,7 +148,7 @@ export default function PaymentsPage() {
           </div>
           <div>
             <label className="label">Forma de pago</label>
-            <select className="input w-44" value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)}>
+            <select className="input w-full lg:w-44" value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)}>
               <option value="">Todas</option>
               {Object.entries(PAYMENT_METHOD_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
@@ -157,14 +157,14 @@ export default function PaymentsPage() {
           </div>
           <div>
             <label className="label">Responsable</label>
-            <select className="input w-44" value={filterUser} onChange={(e) => setFilterUser(e.target.value)}>
+            <select className="input w-full lg:w-44" value={filterUser} onChange={(e) => setFilterUser(e.target.value)}>
               <option value="">Todos</option>
               {users.map((u) => <option key={u.id} value={u.id}>{u.name ?? u.email}</option>)}
             </select>
           </div>
           <button
             onClick={() => { setSearch(""); setFilterCategory(""); setFilterStatus(""); setFilterMethod(""); setFilterUser(""); }}
-            className="btn-secondary"
+            className="btn-secondary w-full sm:w-auto"
           >
             Limpiar
           </button>

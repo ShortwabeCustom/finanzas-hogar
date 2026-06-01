@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useLimpiarCampos } from "@/hooks/useLimpiarCampos";
 import Header from "@/components/layout/Header";
 import Sheet from "@/components/ui/Sheet";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -16,6 +18,10 @@ import {
 } from "@/lib/category-visuals";
 
 const PRESET_COLORS = CATEGORY_PRESET_COLORS;
+
+const EMPTY_CATEGORY_VALUES = {
+  name: "", description: "", color: "#6366f1", icon: "", type: "BOTH" as const,
+};
 
 const TYPE_LABELS: Record<string, string> = {
   PAYMENT: "Solo pagos",
@@ -60,6 +66,8 @@ function CategoryForm({
 
   const selectedColor = watch("color");
   const selectedIcon = watch("icon");
+
+  const limpiarCampos = useLimpiarCampos(reset, EMPTY_CATEGORY_VALUES);
 
   useEffect(() => {
     reset({
@@ -133,6 +141,7 @@ function CategoryForm({
       </div>
       <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
         <button type="button" onClick={onCancel} className="btn-secondary" disabled={isSubmitting}>Cancelar</button>
+        <button type="button" onClick={limpiarCampos} className="btn-secondary" disabled={isSubmitting}>Limpiar campos</button>
         <button type="submit" className="btn-primary" disabled={isSubmitting}>
           {isSubmitting ? "Guardando..." : isEdit ? "Actualizar" : "Crear categoría"}
         </button>
@@ -142,6 +151,11 @@ function CategoryForm({
 }
 
 export default function CategoriesPage() {
+  const { data: session } = useSession();
+  const role = session?.user?.role ?? "VIEWER";
+  const canEdit = role === "ADMIN" || role === "EDITOR";
+  const canDelete = role === "ADMIN" || role === "EDITOR";
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -189,10 +203,12 @@ export default function CategoriesPage() {
         title="Categorías"
         subtitle="Gestiona las categorías de pagos y despensa"
         actions={
-          <button onClick={() => { setEditingCat(null); setShowForm(true); }} className="btn-primary">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            Nueva categoría
-          </button>
+          canEdit ? (
+            <button onClick={() => { setEditingCat(null); setShowForm(true); }} className="btn-primary">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Nueva categoría
+            </button>
+          ) : undefined
         }
       />
 
@@ -228,26 +244,30 @@ export default function CategoriesPage() {
                   {cat._count?.payments ?? 0} pago{(cat._count?.payments ?? 0) !== 1 ? "s" : ""} ·{" "}
                   {cat._count?.pantryItems ?? 0} despensa
                 </span>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => { setEditingCat(cat); setShowForm(true); }}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                    title="Editar"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => setDeletingCat(cat)}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                    title="Desactivar"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
+                {canEdit && (
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => { setEditingCat(cat); setShowForm(true); }}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                      title="Editar"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    {canDelete && (
+                      <button
+                        onClick={() => setDeletingCat(cat)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Desactivar"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
