@@ -53,12 +53,66 @@ export async function GET(req: NextRequest) {
 
     const transactions = await prisma.bankTransaction.findMany({
       where,
+      include: {
+        personalPayment: { select: { id: true, folio: true } },
+      },
       orderBy: { transactionDate: "desc" },
     });
 
     return NextResponse.json(transactions);
   } catch (error) {
     console.error("[financial/transactions GET]", error);
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+  }
+}
+
+/**
+ * POST /api/financial/transactions
+ * Creates a manual bank transaction for the session user.
+ * Body: { statementId, accountId, transactionDate, description, reference?, chargeAmount?, creditAmount?, balance? }
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (session.user.role === "VIEWER") return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
+
+    const userId = session.user.id;
+    const body = await req.json();
+    const { statementId, accountId, transactionDate, description, reference, chargeAmount, creditAmount, balance } = body as {
+      statementId: string;
+      accountId: string;
+      transactionDate: string;
+      description: string;
+      reference?: string | null;
+      chargeAmount?: number | null;
+      creditAmount?: number | null;
+      balance?: number | null;
+    };
+
+    if (!statementId || !accountId || !transactionDate || !description?.trim()) {
+      return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
+    }
+
+    const account = await prisma.bankAccount.findFirst({ where: { id: accountId, userId } });
+    if (!account) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
+    const txn = await prisma.bankTransaction.create({
+      data: {
+        statementId,
+        accountId,
+        transactionDate: new Date(transactionDate + "T12:00:00"),
+        description: description.trim(),
+        reference: reference?.trim() || null,
+        chargeAmount: chargeAmount != null ? chargeAmount : null,
+        creditAmount: creditAmount != null ? creditAmount : null,
+        balance: balance != null ? balance : null,
+      },
+    });
+
+    return NextResponse.json(txn, { status: 201 });
+  } catch (error) {
+    console.error("[financial/transactions POST]", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { BankAccount, BankStatement } from "@prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ export interface RecoveryPlanSummary {
 
 export interface PaymentPlanItem {
   priority: number;
-  sourceModel: string;
+  sourceModel: "PersonalPayment" | "BankStatement";
   id: string;
   name: string;
   amount: number;
@@ -162,6 +163,195 @@ function fmtMXN(amount: number): string {
 
 // Reserva mínima de operación mensual
 const BASIC_RESERVE_MXN = 500;
+const ESTIMATED_CREDIT_CARD_DUE_DAYS = 20;
+
+type CreditAccountWithStatements = BankAccount & {
+  statements: BankStatement[];
+};
+
+type BankCashflowTransaction = {
+  transactionDate: Date;
+  chargeAmount: { toString(): string } | null;
+  creditAmount: { toString(): string } | null;
+  description: string;
+  category: string | null;
+  account: {
+    type: "CHECKING" | "CREDIT";
+  };
+};
+
+function roundMoney(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function isSameOrPast(date: Date | null): boolean {
+  const days = daysFromNow(date);
+  return days !== null && days < 0;
+}
+
+function hasAnyKeyword(value: string, keywords: string[]): boolean {
+  const n = normalizeText(value);
+  return keywords.some((keyword) => n.includes(normalizeText(keyword)));
+}
+
+function looksLikeCheckingIncome(description: string): boolean {
+  return hasAnyKeyword(description, [
+    "abono",
+    "recibida",
+    "recepcion",
+    "nomina",
+    "bonifica",
+    "deposito",
+  ]);
+}
+
+function isInternalCreditCardPayment(description: string): boolean {
+  return hasAnyKeyword(description, [
+    "cargo pago tarjeta credito",
+    "pago tarjeta credito",
+    "pago de tarjeta de credito",
+    "pago a tarjeta",
+    "pago de tarjeta",
+  ]);
+}
+
+function inferBankCategory(description: string, fallback: string | null): string {
+  if (fallback) return fallback;
+  if (isInternalCreditCardPayment(description)) return "Pago a tarjeta";
+  if (hasAnyKeyword(description, ["nomina", "recibida", "recepcion", "deposito", "abono"])) return "Ingresos";
+  if (hasAnyKeyword(description, ["volkswagen", "domiciliacion", "servicio", "cfe", "telcel", "telmex"])) return "Servicios";
+  if (hasAnyKeyword(description, ["costco", "soriana", "walmart", "chedraui", "super", "cosco"])) return "Supermercado";
+  if (hasAnyKeyword(description, ["rest", "sushi", "tok", "taquer", "pizza", "hamburg", "comida"])) return "Restaurantes";
+  if (hasAnyKeyword(description, ["uber", "didi", "gasolin", "pemex", "shell", "bp "])) return "Transporte";
+  if (hasAnyKeyword(description, ["netflix", "spotify", "apple", "google", "disney", "xbox"])) return "Suscripciones";
+  if (hasAnyKeyword(description, ["farmacia", "hospital", "medic", "dental"])) return "Salud";
+  if (hasAnyKeyword(description, ["transferencia", "spei", "transf"])) return "Transferencias";
+  return "Otros";
+}
+
+function buildBankCashflow(transactions: BankCashflowTransaction[]) {
+  const incomeByMonth = new Map<string, number>();
+  const expenseByMonth = new Map<string, number>();
+  const variableCatAgg = new Map<string, number>();
+
+  for (const t of transactions) {
+    const key = monthKey(new Date(t.transactionDate));
+    const charge = toNum(t.chargeAmount);
+    const credit = toNum(t.creditAmount);
+
+    if (t.account.type === "CHECKING") {
+      const chargeIsIncome = charge > 0 && looksLikeCheckingIncome(t.description);
+      if (credit > 0 || chargeIsIncome) {
+        const amount = credit > 0 ? credit : charge;
+        incomeByMonth.set(key, (incomeByMonth.get(key) ?? 0) + amount);
+        continue;
+      }
+
+      if (charge > 0 && !isInternalCreditCardPayment(t.description)) {
+        expenseByMonth.set(key, (expenseByMonth.get(key) ?? 0) + charge);
+        const cat = inferBankCategory(t.description, t.category);
+        variableCatAgg.set(cat, (variableCatAgg.get(cat) ?? 0) + charge);
+      }
+      continue;
+    }
+
+    if (t.account.type === "CREDIT" && charge > 0) {
+      // Credit-card charges are real spending. Credit-card credits are payments
+      // from another account and should not be counted as income.
+      expenseByMonth.set(key, (expenseByMonth.get(key) ?? 0) + charge);
+      const cat = inferBankCategory(t.description, t.category);
+      variableCatAgg.set(cat, (variableCatAgg.get(cat) ?? 0) + charge);
+    }
+  }
+
+  return { incomeByMonth, expenseByMonth, variableCatAgg };
+}
+
+function estimateCreditCardDueDate(statement: BankStatement): Date | null {
+  const base = statement.cutDate ?? statement.periodEnd;
+  return base ? addDays(base, ESTIMATED_CREDIT_CARD_DUE_DAYS) : null;
+}
+
+function accountDisplayName(account: BankAccount): string {
+  const last4 = account.cardNumber ? ` ${account.cardNumber}` : "";
+  return `${account.bankName} ${account.productName}${last4}`.replace(/\s+/g, " ").trim();
+}
+
+function buildCreditStatementItems(accounts: CreditAccountWithStatements[]): PaymentPlanItem[] {
+  const items: PaymentPlanItem[] = [];
+
+  for (const account of accounts) {
+    const statements = [...account.statements].sort(
+      (a, b) => a.periodEnd.getTime() - b.periodEnd.getTime()
+    );
+    if (statements.length === 0) continue;
+
+    let balance: number | null = null;
+    let inferredFromZero = false;
+    let hasKnownBalance = false;
+
+    for (const statement of statements) {
+      if (statement.openingBalance !== null) {
+        balance = toNum(statement.openingBalance);
+        hasKnownBalance = true;
+      }
+
+      if (statement.closingBalance !== null) {
+        balance = toNum(statement.closingBalance);
+        hasKnownBalance = true;
+      } else {
+        if (balance === null) {
+          balance = 0;
+          inferredFromZero = true;
+        }
+        balance = Math.max(
+          0,
+          roundMoney(balance + toNum(statement.totalCharges) - toNum(statement.totalCredits))
+        );
+      }
+    }
+
+    const latest = statements[statements.length - 1];
+    const amount = roundMoney(balance ?? 0);
+    if (amount <= 0) continue;
+
+    const dueDate = estimateCreditCardDueDate(latest);
+    const status = isSameOrPast(dueDate) ? "OVERDUE" : "PENDING";
+    const dueIn = daysFromNow(dueDate);
+    const confidenceLabel = inferredFromZero && !hasKnownBalance
+      ? "saldo inferido con movimientos importados; el XML no trae saldo inicial"
+      : latest.closingBalance !== null
+        ? "saldo final leído del estado de cuenta"
+        : "saldo reconstruido desde el último saldo conocido";
+
+    let recommendedAction = "Liquidar saldo al corte";
+    if (status === "OVERDUE") recommendedAction = "Pagar de inmediato";
+    else if (dueIn !== null && dueIn <= 7) recommendedAction = "Pagar esta semana";
+    else if (dueIn !== null && dueIn <= 15) recommendedAction = "Programar pago";
+
+    items.push({
+      priority: 0,
+      sourceModel: "BankStatement",
+      id: `statement-${latest.id}`,
+      name: accountDisplayName(account),
+      amount,
+      dueDate: dueDate?.toISOString().slice(0, 10) ?? null,
+      status,
+      category: "Tarjeta de crédito",
+      paymentMethod: "CREDIT_CARD",
+      recommendedAction,
+      reason: `Último corte ${latest.cutDate?.toISOString().slice(0, 10) ?? latest.periodEnd.toISOString().slice(0, 10)}; fecha límite estimada a ${ESTIMATED_CREDIT_CARD_DUE_DAYS} días del corte; ${confidenceLabel}`,
+    });
+  }
+
+  return items;
+}
 
 // ─── Forecast ────────────────────────────────────────────────────────────────
 
@@ -301,7 +491,7 @@ export async function getRecoveryPlan(
   const now = new Date();
   const periodStart = new Date(now.getFullYear(), now.getMonth() - safeMonths, 1, 0, 0, 0, 0);
 
-  const [activePayments, recentPaid, recentTransactions, rawSnapshots] = await Promise.all([
+  const [activePayments, recentPaid, recentTransactions, creditAccounts, rawSnapshots] = await Promise.all([
     prisma.personalPayment.findMany({
       where: { userId, status: { in: ["PENDING", "OVERDUE"] } },
       include: { category: true, card: true },
@@ -330,7 +520,29 @@ export async function getRecoveryPlan(
         creditAmount: true,
         description: true,
         category: true,
+        account: {
+          select: {
+            type: true,
+          },
+        },
       },
+    }),
+    prisma.bankAccount.findMany({
+      where: {
+        userId,
+        type: "CREDIT",
+        active: true,
+        statements: { some: {} },
+      },
+      include: {
+        statements: {
+          orderBy: { periodEnd: "asc" },
+        },
+      },
+      orderBy: [
+        { bankName: "asc" },
+        { productName: "asc" },
+      ],
     }),
     prisma.financialSnapshot.findMany({
       where: { userId },
@@ -351,14 +563,25 @@ export async function getRecoveryPlan(
   // ─── Segmentar pagos ────────────────────────────────────────────────────────
   const overduePayments = activePayments.filter((p) => p.status === "OVERDUE");
   const pendingPayments = activePayments.filter((p) => p.status === "PENDING");
+  const creditStatementItems = buildCreditStatementItems(creditAccounts);
+  const overdueCreditStatements = creditStatementItems.filter((p) => p.status === "OVERDUE");
+  const pendingCreditStatements = creditStatementItems.filter((p) => p.status === "PENDING");
 
   const dueIn7 = pendingPayments.filter((p) => {
     const d = daysFromNow(p.dueDate);
     return d !== null && d >= 0 && d <= 7;
   });
+  const creditDueIn7 = pendingCreditStatements.filter((p) => {
+    const d = p.dueDate ? daysFromNow(new Date(p.dueDate)) : null;
+    return d !== null && d >= 0 && d <= 7;
+  });
 
   const dueIn15 = pendingPayments.filter((p) => {
     const d = daysFromNow(p.dueDate);
+    return d !== null && d >= 0 && d <= 15;
+  });
+  const creditDueIn15 = pendingCreditStatements.filter((p) => {
+    const d = p.dueDate ? daysFromNow(new Date(p.dueDate)) : null;
     return d !== null && d >= 0 && d <= 15;
   });
 
@@ -390,17 +613,9 @@ export async function getRecoveryPlan(
     }
   }
 
-  const bankIncomeByMonth = new Map<string, number>();
-  const bankExpenseByMonth = new Map<string, number>();
-  for (const t of recentTransactions) {
-    const key = monthKey(new Date(t.transactionDate));
-    if (toNum(t.creditAmount) > 0) {
-      bankIncomeByMonth.set(key, (bankIncomeByMonth.get(key) ?? 0) + toNum(t.creditAmount));
-    }
-    if (toNum(t.chargeAmount) > 0) {
-      bankExpenseByMonth.set(key, (bankExpenseByMonth.get(key) ?? 0) + toNum(t.chargeAmount));
-    }
-  }
+  const bankCashflow = buildBankCashflow(recentTransactions);
+  const usesBankCashflow =
+    bankCashflow.incomeByMonth.size > 0 || bankCashflow.expenseByMonth.size > 0;
 
   function avgMap(m: Map<string, number>): number | null {
     if (m.size === 0) return null;
@@ -408,22 +623,30 @@ export async function getRecoveryPlan(
     return total / m.size;
   }
 
-  const monthlyIncomeAvg = incomeByMonth.size > 0
-    ? avgMap(incomeByMonth)
-    : avgMap(bankIncomeByMonth);
+  const cashflowIncomeByMonth = usesBankCashflow ? bankCashflow.incomeByMonth : incomeByMonth;
+  const cashflowExpenseByMonth = usesBankCashflow ? bankCashflow.expenseByMonth : expenseByMonth;
 
-  const monthlyExpenseAvg = expenseByMonth.size > 0
-    ? avgMap(expenseByMonth)
-    : avgMap(bankExpenseByMonth);
+  const monthlyIncomeAvg = avgMap(cashflowIncomeByMonth);
+  const monthlyExpenseAvg = avgMap(cashflowExpenseByMonth);
 
   const fixedExpensesAvg = avgMap(fixedByMonth);
-  const variableExpensesAvg = avgMap(variableByMonth);
+  const variableExpensesAvg = usesBankCashflow
+    ? avgMap(bankCashflow.expenseByMonth)
+    : avgMap(variableByMonth);
 
   // ─── Totales ────────────────────────────────────────────────────────────────
-  const overdueTotal = overduePayments.reduce((s, p) => s + toNum(p.amount), 0);
-  const pendingTotal = pendingPayments.reduce((s, p) => s + toNum(p.amount), 0);
-  const dueIn7Total = dueIn7.reduce((s, p) => s + toNum(p.amount), 0);
-  const dueIn15Total = dueIn15.reduce((s, p) => s + toNum(p.amount), 0);
+  const overdueTotal =
+    overduePayments.reduce((s, p) => s + toNum(p.amount), 0) +
+    overdueCreditStatements.reduce((s, p) => s + p.amount, 0);
+  const pendingTotal =
+    pendingPayments.reduce((s, p) => s + toNum(p.amount), 0) +
+    pendingCreditStatements.reduce((s, p) => s + p.amount, 0);
+  const dueIn7Total =
+    dueIn7.reduce((s, p) => s + toNum(p.amount), 0) +
+    creditDueIn7.reduce((s, p) => s + p.amount, 0);
+  const dueIn15Total =
+    dueIn15.reduce((s, p) => s + toNum(p.amount), 0) +
+    creditDueIn15.reduce((s, p) => s + p.amount, 0);
 
   // ─── Flujo libre ────────────────────────────────────────────────────────────
   let freeCashflow: number | null = null;
@@ -441,7 +664,7 @@ export async function getRecoveryPlan(
     const safeIncome = Math.max(monthlyIncomeAvg, 1);
     if (overdueTotal > 0 && overdueTotal / safeIncome > 0.5) {
       financialStatus = "critical";
-    } else if (overdueTotal > 0 || (availableForDebt !== null && availableForDebt < 0)) {
+    } else if (overdueTotal > 0 || (freeCashflow !== null && freeCashflow < 0)) {
       financialStatus = "tight";
     } else if (availableForDebt !== null && availableForDebt < safeIncome * 0.1) {
       financialStatus = "tight";
@@ -474,6 +697,15 @@ export async function getRecoveryPlan(
     });
   }
 
+  for (const p of [...overdueCreditStatements]
+    .sort((a, b) => {
+      const da = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+      const db = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+      return da - db || b.amount - a.amount;
+    })) {
+    paymentPlan.push({ ...p, priority: priority++ });
+  }
+
   const inPlanIds = new Set(paymentPlan.map((i) => i.id));
   for (const p of [...dueIn7]
     .filter((p) => !inPlanIds.has(p.id))
@@ -492,6 +724,17 @@ export async function getRecoveryPlan(
       recommendedAction: "Pagar esta semana",
       reason: days === 0 ? "Vence hoy" : `Vence en ${days} día${days === 1 ? "" : "s"}`,
     });
+    inPlanIds.add(p.id);
+  }
+
+  for (const p of [...creditDueIn7]
+    .filter((p) => !inPlanIds.has(p.id))
+    .sort((a, b) => {
+      const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+      const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+      return da - db || b.amount - a.amount;
+    })) {
+    paymentPlan.push({ ...p, priority: priority++ });
     inPlanIds.add(p.id);
   }
 
@@ -515,6 +758,17 @@ export async function getRecoveryPlan(
       recommendedAction: "Programar pago",
       reason: "Gasto recurrente próximo a vencer",
     });
+    inPlanIds.add(p.id);
+  }
+
+  for (const p of [...creditDueIn15]
+    .filter((p) => !inPlanIds.has(p.id))
+    .sort((a, b) => {
+      const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+      const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+      return da - db || b.amount - a.amount;
+    })) {
+    paymentPlan.push({ ...p, priority: priority++ });
     inPlanIds.add(p.id);
   }
 
@@ -543,20 +797,35 @@ export async function getRecoveryPlan(
     });
   }
 
+  for (const p of [...pendingCreditStatements]
+    .filter((p) => !inPlanIds.has(p.id))
+    .sort((a, b) => b.amount - a.amount)) {
+    paymentPlan.push({ ...p, priority: priority++ });
+    inPlanIds.add(p.id);
+  }
+
   // ─── Sugerencias de recorte ─────────────────────────────────────────────────
   const cutSuggestions: CutSuggestion[] = [];
-  const variableCatAgg = new Map<string, number>();
+  const variableCatAgg = usesBankCashflow
+    ? bankCashflow.variableCatAgg
+    : new Map<string, number>();
   const recentMonths = Math.max(expenseByMonth.size, 1);
 
-  for (const p of expensePayments.filter((p) => p.period === "ONCE")) {
-    const cat = p.category?.name ?? "Sin categoría";
-    variableCatAgg.set(cat, (variableCatAgg.get(cat) ?? 0) + toNum(p.amount));
+  if (!usesBankCashflow) {
+    for (const p of expensePayments.filter((p) => p.period === "ONCE")) {
+      const cat = p.category?.name ?? "Sin categoría";
+      variableCatAgg.set(cat, (variableCatAgg.get(cat) ?? 0) + toNum(p.amount));
+    }
   }
+
+  const suggestionMonths = usesBankCashflow
+    ? Math.max(bankCashflow.expenseByMonth.size, 1)
+    : recentMonths;
 
   for (const [cat, total] of [...variableCatAgg.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)) {
-    const monthly = total / recentMonths;
+    const monthly = total / suggestionMonths;
     if (monthly > 100) {
       cutSuggestions.push({
         category: cat,
@@ -588,7 +857,7 @@ export async function getRecoveryPlan(
     });
   }
 
-  if (availableForDebt !== null && availableForDebt < 0) {
+  if (freeCashflow !== null && freeCashflow < 0) {
     insights.push({
       type: "risk",
       title: "Egresos superan ingresos",
@@ -624,6 +893,16 @@ export async function getRecoveryPlan(
     });
   }
 
+  if (creditStatementItems.length > 0) {
+    const totalCreditDebt = creditStatementItems.reduce((s, p) => s + p.amount, 0);
+    insights.push({
+      type: overdueCreditStatements.length > 0 ? "warning" : "info",
+      title: `${fmtMXN(totalCreditDebt)} en saldos de tarjeta`,
+      message: `El plan incluye ${creditStatementItems.length} tarjeta${creditStatementItems.length === 1 ? "" : "s"} con saldo tomado del último estado de cuenta importado. Las fechas límite se estiman como corte + ${ESTIMATED_CREDIT_CARD_DUE_DAYS} días.`,
+      suggestedAction: "Prioriza estos saldos por fecha límite y evita nuevos cargos hasta estabilizar el flujo.",
+    });
+  }
+
   if (financialStatus === "healthy") {
     insights.push({
       type: "info",
@@ -633,7 +912,13 @@ export async function getRecoveryPlan(
     });
   }
 
-  if (pendingPayments.length === 0 && overduePayments.length === 0 && recentPaid.length === 0) {
+  if (
+    pendingPayments.length === 0 &&
+    overduePayments.length === 0 &&
+    creditStatementItems.length === 0 &&
+    recentPaid.length === 0 &&
+    recentTransactions.length === 0
+  ) {
     insights.push({
       type: "info",
       title: "Sin registros financieros",
@@ -646,13 +931,25 @@ export async function getRecoveryPlan(
   const hasExplicitClassification = recentPaid.some(
     (p) => p.financialClass != null || p.type != null
   );
+  const hasInferredCreditDebt = creditStatementItems.some((item) =>
+    item.reason.includes("saldo inferido")
+  );
+  const missingFields: string[] = [];
+
+  if (!usesBankCashflow && recentPaid.length > 0 && !hasExplicitClassification) {
+    missingFields.push("PersonalPayment.financialClass");
+  }
+
+  if (hasInferredCreditDebt) {
+    missingFields.push("BankStatement.closingBalance");
+  }
 
   const dataQuality: DataQuality = {
     hasIncomeData: monthlyIncomeAvg !== null,
     hasExpenseData: monthlyExpenseAvg !== null,
-    hasPendingPayments: pendingPayments.length > 0,
-    hasOverduePayments: overduePayments.length > 0,
-    missingFields: hasExplicitClassification ? [] : ["PersonalPayment.financialClass"],
+    hasPendingPayments: pendingPayments.length > 0 || pendingCreditStatements.length > 0,
+    hasOverduePayments: overduePayments.length > 0 || overdueCreditStatements.length > 0,
+    missingFields,
   };
 
   const financialScore = buildFinancialScore(
@@ -662,8 +959,8 @@ export async function getRecoveryPlan(
     dueIn7Total,
     dueIn15Total,
     pendingTotal,
-    incomeByMonth,
-    expenseByMonth,
+    cashflowIncomeByMonth,
+    cashflowExpenseByMonth,
   );
 
   const summaryObj: RecoveryPlanSummary = {
@@ -709,8 +1006,8 @@ export async function getRecoveryPlan(
     currentSnapshot,
   ].sort((a, b) => a.date.localeCompare(b.date));
 
-  // Fire-and-forget upsert del mes actual
-  prisma.financialSnapshot.upsert({
+  // Persistir snapshot del mes actual antes de responder evita carreras con el ciclo de request.
+  await prisma.financialSnapshot.upsert({
     where: { userId_date: { userId, date: monthStart } },
     update: {
       score: currentSnapshot.score,

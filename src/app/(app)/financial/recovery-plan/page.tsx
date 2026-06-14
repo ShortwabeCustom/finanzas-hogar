@@ -653,6 +653,10 @@ export default function RecoveryPlanPage() {
 
   async function handleMarkPaid() {
     if (!confirmItem) return;
+    if (confirmItem.sourceModel !== "PersonalPayment") {
+      setConfirmItem(null);
+      return;
+    }
     setMarkingPaid(true);
     try {
       const res = await fetch(`/api/personal/payments/${confirmItem.id}/mark-paid`, {
@@ -978,15 +982,21 @@ export default function RecoveryPlanPage() {
                                 {item.reason}
                               </td>
                               <td className="px-4 py-3">
-                                <button
-                                  onClick={() => { setSuccessId(null); setConfirmItem(item); }}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors whitespace-nowrap"
-                                >
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                  Marcar pagado
-                                </button>
+                                {item.sourceModel === "PersonalPayment" ? (
+                                  <button
+                                    onClick={() => { setSuccessId(null); setConfirmItem(item); }}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors whitespace-nowrap"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Marcar pagado
+                                  </button>
+                                ) : (
+                                  <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-50 text-gray-500 border border-gray-200 whitespace-nowrap">
+                                    Saldo de corte
+                                  </span>
+                                )}
                               </td>
                             </tr>
                           );
@@ -1042,7 +1052,9 @@ export default function RecoveryPlanPage() {
             {dataQuality.missingFields.length > 0 && (
               <div className="card p-4 border border-gray-200 bg-gray-50">
                 <p className="text-xs text-gray-400">
-                  El análisis de categorías usa inferencia por nombre. Para mayor precisión, clasifica tus ingresos en categorías como &ldquo;Sueldo&rdquo;, &ldquo;Depósito&rdquo; o &ldquo;Ingreso&rdquo;.
+                  {dataQuality.missingFields.includes("BankStatement.closingBalance")
+                    ? "Algunos saldos de tarjeta se reconstruyeron con cargos y abonos porque el XML importado no trae saldo final explícito. Para máxima precisión, importa el PDF del estado de cuenta cuando esté disponible."
+                    : "El análisis de categorías usa inferencia por nombre. Para mayor precisión, clasifica tus ingresos en categorías como “Sueldo”, “Depósito” o “Ingreso”."}
                 </p>
               </div>
             )}

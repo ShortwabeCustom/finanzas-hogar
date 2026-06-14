@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Treemap, Cell, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
 } from "recharts";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/StatusBadge";
+import ApiErrorState from "@/components/ui/ApiErrorState";
 import { formatCurrency, formatDate, PAYMENT_METHOD_LABELS } from "@/lib/utils";
 
 const METHOD_COLORS: Record<string, string> = {
@@ -59,6 +60,7 @@ function TreemapCategoryContent(props: any) {
 export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [timeFilter, setTimeFilter] = useState<"day" | "week" | "month" | "year" | "range">("year");
   const [selectedDay, setSelectedDay] = useState(new Date().toISOString().slice(0, 10));
   const [selectedWeek, setSelectedWeek] = useState(`${new Date().getFullYear()}-W01`);
@@ -114,19 +116,43 @@ export default function DashboardPage() {
     };
   }
 
-  useEffect(() => {
+  const loadDashboard = useCallback(async () => {
     const range = buildRange();
     setLoading(true);
+    setError(null);
     const granularity = timeFilter === "week" ? "day" : timeFilter === "month" ? "week" : "month";
-    fetch(`/api/dashboard?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}&granularity=${granularity}`)
-      .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); });
-  }, [timeFilter, selectedDay, selectedWeek, selectedMonth, selectedYear, fromDate, toDate]);
+    try {
+      const res = await fetch(
+        `/api/dashboard?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}&granularity=${granularity}`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const d = await res.json();
+      setData(d);
+    } catch {
+      setError("No se pudo cargar el dashboard. Verifica tu conexión e intenta de nuevo.");
+    } finally {
+      setLoading(false);
+    }
+  }, [timeFilter, selectedDay, selectedWeek, selectedMonth, selectedYear, fromDate, toDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { loadDashboard(); }, [loadDashboard]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">Resumen general de finanzas del hogar</p>
+        </div>
+        <ApiErrorState message={error ?? undefined} onRetry={loadDashboard} />
       </div>
     );
   }

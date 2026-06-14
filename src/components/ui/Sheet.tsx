@@ -56,6 +56,7 @@ export default function Sheet({ open, onClose, title, children, size = "md" }: S
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
           <button
             onClick={onClose}
+            aria-label={`Cerrar panel ${title}`}
             className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

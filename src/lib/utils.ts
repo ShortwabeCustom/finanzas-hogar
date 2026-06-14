@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { format, formatDistanceToNow, isAfter, isBefore, addDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { randomBytes } from "crypto";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -50,7 +51,8 @@ export function generateFolio(prefix = "PAG"): string {
   const now = new Date();
   const year = now.getFullYear().toString().slice(-2);
   const month = (now.getMonth() + 1).toString().padStart(2, "0");
-  const random = Math.floor(Math.random() * 9000 + 1000);
+  // Use OS entropy instead of Math.random() for better uniqueness
+  const random = (randomBytes(2).readUInt16BE(0) % 9000 + 1000).toString();
   return `${prefix}-${year}${month}-${random}`;
 }
 

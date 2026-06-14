@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // pdf-parse 2.x is ESM-only — exclude from Turbopack/webpack bundling
+  serverExternalPackages: ["pdf-parse"],
   images: {
     remotePatterns: [],
   },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { cn } from "@/lib/utils";
 
 interface ModalProps {
@@ -20,6 +20,8 @@ const sizeClasses = {
 };
 
 export default function Modal({ open, onClose, title, children, size = "lg" }: ModalProps) {
+  const titleId = useId();
+
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
@@ -42,6 +44,9 @@ export default function Modal({ open, onClose, title, children, size = "lg" }: M
       />
       {/* Dialog */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={cn(
           "relative w-full bg-white rounded-xl shadow-xl",
           sizeClasses[size],
@@ -50,12 +55,13 @@ export default function Modal({ open, onClose, title, children, size = "lg" }: M
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <h2 id={titleId} className="text-lg font-semibold text-gray-900">{title}</h2>
           <button
             onClick={onClose}
+            aria-label={`Cerrar ${title}`}
             className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>

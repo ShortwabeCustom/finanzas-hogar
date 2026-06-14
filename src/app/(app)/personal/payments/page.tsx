@@ -14,6 +14,7 @@ import {
   formatCurrency, formatDate,
   PERIOD_LABELS, STATUS_LABELS, PAYMENT_METHOD_LABELS,
 } from "@/lib/utils";
+import toast from "react-hot-toast";
 
 interface PersonalCategory { id: string; name: string; color: string; }
 interface PersonalCard {
@@ -258,10 +259,11 @@ function PaymentForm({
               </a>
               <button
                 type="button"
+                aria-label="Quitar comprobante adjunto"
                 onClick={() => { setReceiptUrl(""); setValue("receipt", ""); }}
                 className="text-gray-400 hover:text-red-500 transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -374,10 +376,17 @@ export default function PersonalPaymentsPage() {
 
     if (!res.ok) {
       const body = await res.json();
-      setError(body.error ?? "Error al guardar");
+      const msg = body.error ?? "Error al guardar";
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
+    if (editing) {
+      toast.success(`Pago "${editing.name}" actualizado`);
+    } else {
+      toast.success("Pago personal creado correctamente");
+    }
     setShowForm(false);
     setEditing(null);
     fetchPayments();
@@ -386,8 +395,13 @@ export default function PersonalPaymentsPage() {
   async function handleDelete() {
     if (!deleting) return;
     setDeleteLoading(true);
-    await fetch(`/api/personal/payments/${deleting.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/personal/payments/${deleting.id}`, { method: "DELETE" });
     setDeleteLoading(false);
+    if (res.ok) {
+      toast.success(`Pago "${deleting.name}" eliminado`);
+    } else {
+      toast.error("Error al eliminar el pago");
+    }
     setDeleting(null);
     fetchPayments();
   }
@@ -407,9 +421,9 @@ export default function PersonalPaymentsPage() {
       />
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 flex justify-between items-center">
+        <div role="alert" aria-live="assertive" className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 flex justify-between items-center">
           <span>{error}</span>
-          <button className="font-medium underline ml-2" onClick={() => setError(null)}>Cerrar</button>
+          <button aria-label="Cerrar mensaje de error" className="font-medium underline ml-2" onClick={() => setError(null)}>Cerrar</button>
         </div>
       )}
 
@@ -483,19 +497,19 @@ export default function PersonalPaymentsPage() {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => { setEditing(p); setShowForm(true); }}
+                        aria-label={`Editar pago ${p.name}`}
                         className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                        title="Editar"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </button>
                       <button
                         onClick={() => setDeleting(p)}
+                        aria-label={`Eliminar pago ${p.name}`}
                         className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Eliminar"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
@@ -553,19 +567,19 @@ export default function PersonalPaymentsPage() {
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => { setEditing(p); setShowForm(true); }}
+                            aria-label={`Editar pago ${p.name}`}
                             className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                            title="Editar"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
                           <button
                             onClick={() => setDeleting(p)}
+                            aria-label={`Eliminar pago ${p.name}`}
                             className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                            title="Eliminar"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
                           </button>

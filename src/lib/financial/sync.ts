@@ -21,7 +21,7 @@ function contains(desc: string, ...keywords: string[]) {
 }
 
 // Remove OCR artifacts and truncate
-function cleanName(desc: string, max = 60): string {
+export function cleanName(desc: string, max = 60): string {
   return desc
     .replace(/[â€œâ€™â€¦âÃ¡Ã©Ã­Ã³ÃºÃ±]/g, "")
     .replace(/\s+/g, " ")
@@ -31,7 +31,7 @@ function cleanName(desc: string, max = 60): string {
 
 // ── Auto-categorization ───────────────────────────────────────────────────────
 
-function autoCategory(
+export function autoCategory(
   desc: string,
   isCredit: boolean,
   categories: PersonalCategory[]
@@ -148,7 +148,22 @@ export async function syncBankToPersonalPayments(userId: string): Promise<SyncRe
   let skipped = 0;
   const errors: string[] = [];
 
-  for (const txn of transactions) {
+  // Pre-compute all folios and batch-lookup existing ones — avoids N+1 queries
+  const txnFolios = transactions.map((txn) => {
+    const hash = txn.txnHash ?? txn.id;
+    return `BNK-${hash.substring(0, 16).toUpperCase()}`;
+  });
+  const existingFolios = new Set(
+    (
+      await prisma.personalPayment.findMany({
+        where: { folio: { in: txnFolios } },
+        select: { folio: true },
+      })
+    ).map((p) => p.folio)
+  );
+
+  for (let i = 0; i < transactions.length; i++) {
+    const txn = transactions[i];
     const charge = Number(txn.chargeAmount ?? 0);
     const credit = Number(txn.creditAmount ?? 0);
 
@@ -162,11 +177,9 @@ export async function syncBankToPersonalPayments(userId: string): Promise<SyncRe
     const amount   = isCredit ? credit : charge;
 
     // Stable folio derived from txnHash — guarantees idempotency via unique constraint
-    const hash  = txn.txnHash ?? txn.id;
-    const folio = `BNK-${hash.substring(0, 16).toUpperCase()}`;
+    const folio = txnFolios[i];
 
-    const existing = await prisma.personalPayment.findUnique({ where: { folio } });
-    if (existing) {
+    if (existingFolios.has(folio)) {
       skipped++;
       continue;
     }
@@ -179,18 +192,22 @@ export async function syncBankToPersonalPayments(userId: string): Promise<SyncRe
         data: {
           userId,
           folio,
-          name:          cleanName(txn.description, 60),
-          concept:       txn.description,
+          name:              cleanName(txn.description, 60),
+          concept:           txn.description,
           amount,
           categoryId,
           personalCardId,
-          period:        "ONCE",
-          status:        "PAID",
+          period:            "ONCE",
+          status:            "PAID",
           paymentMethod,
-          paymentDate:   txn.transactionDate,
-          notes:         `[banco:${txn.id}]`,
+          paymentDate:       txn.transactionDate,
+          notes:             `[banco:${txn.id}]`,
+          bankTransactionId: txn.id,
+          sourceStatementId: txn.statementId,
+          importedFromBank:  true,
         },
       });
+      existingFolios.add(folio);
       synced++;
     } catch (e: any) {
       // P2002 = unique constraint — race condition or duplicate hash collision

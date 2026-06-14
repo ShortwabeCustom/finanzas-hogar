@@ -10,6 +10,7 @@ import PaymentTable, { type PaymentRow } from "@/components/payments/PaymentTabl
 import type { PaymentInput } from "@/lib/validations";
 import { PAYMENT_METHOD_LABELS } from "@/lib/utils";
 import { resolveReceiptUrl } from "@/lib/receipt";
+import toast from "react-hot-toast";
 
 interface Category { id: string; name: string; color: string; }
 interface User { id: string; name: string | null; email: string; }
@@ -70,17 +71,27 @@ export default function PaymentsPage() {
     const payload = { ...data, receipt: receiptUrl };
 
     if (editingPayment) {
-      await fetch(`/api/payments/${editingPayment.id}`, {
+      const res = await fetch(`/api/payments/${editingPayment.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (res.ok) {
+        toast.success(`Pago "${editingPayment.name}" actualizado`);
+      } else {
+        toast.error("Error al actualizar el pago");
+      }
     } else {
-      await fetch("/api/payments", {
+      const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (res.ok) {
+        toast.success("Pago creado correctamente");
+      } else {
+        toast.error("Error al crear el pago");
+      }
     }
 
     setShowForm(false);
@@ -91,9 +102,14 @@ export default function PaymentsPage() {
   async function handleDelete() {
     if (!deletingPayment) return;
     setDeleteLoading(true);
-    await fetch(`/api/payments/${deletingPayment.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/payments/${deletingPayment.id}`, { method: "DELETE" });
     setDeleteLoading(false);
     setDeletingPayment(null);
+    if (res.ok) {
+      toast.success(`Pago "${deletingPayment.name}" eliminado`);
+    } else {
+      toast.error("Error al eliminar el pago");
+    }
     fetchPayments();
   }
 

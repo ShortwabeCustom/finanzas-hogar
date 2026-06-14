@@ -150,6 +150,17 @@ model Payment {
 
   personalCardId String?
   card           PersonalCard? @relation("SharedPaymentCard", fields: [personalCardId], references: [id], onDelete: SetNull)
+
+  bankTransactionId String?         @unique
+  sourceStatementId String?
+  importedFromBank  Boolean         @default(false)
+
+  bankTransaction BankTransaction? @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([registeredAt])
+  @@index([paymentDate])
+  @@index([status])
+  @@index([categoryId])
 }
 
 // ─── PANTRY ────────────────────────────────────────────────────────────────────
@@ -249,17 +260,23 @@ model PersonalPayment {
   paymentDate    DateTime?
   notes          String?        @db.Text
   receipt        String?
-  type           String?
-  financialClass FinancialClass?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  type              String?
+  financialClass    FinancialClass?
+  bankTransactionId String?         @unique
+  sourceStatementId String?
+  importedFromBank  Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
-  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category PersonalCategory  @relation(fields: [categoryId], references: [id])
-  card     PersonalCard?     @relation(fields: [personalCardId], references: [id])
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category        PersonalCategory  @relation(fields: [categoryId], references: [id])
+  card            PersonalCard?     @relation(fields: [personalCardId], references: [id])
+  bankTransaction BankTransaction?  @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([userId, status])
+  @@index([userId, paymentDate])
+  @@index([userId, createdAt])
 }
 
 // ─── PERSONAL CARDS ────────────────────────────────────────────────────────────
@@ -319,18 +336,24 @@ enum AccountType {
   CREDIT
 }
 
+enum BankAccountScope {
+  PERSONAL
+  HOUSEHOLD
+}
+
 model BankAccount {
-  id            String      @id @default(cuid())
+  id            String           @id @default(cuid())
   userId        String
   bankName      String
   productName   String
   accountNumber String?
   clabe         String?
   cardNumber    String?
-  currency      String      @default("MXN")
+  currency      String           @default("MXN")
   type          AccountType
-  active        Boolean     @default(true)
-  createdAt     DateTime    @default(now())
+  scope         BankAccountScope @default(PERSONAL)
+  active        Boolean          @default(true)
+  createdAt     DateTime         @default(now())
 
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   statements   BankStatement[]
@@ -338,6 +361,7 @@ model BankAccount {
 
   @@unique([userId, bankName, productName, cardNumber])
   @@index([userId])
+  @@index([scope])
 }
 
 model BankStatement {
@@ -375,8 +399,10 @@ model BankTransaction {
   txnHash         String?
   createdAt       DateTime @default(now())
 
-  statement BankStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
-  account   BankAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  statement       BankStatement    @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  account         BankAccount      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  personalPayment PersonalPayment?
+  payment         Payment?
 
   @@unique([statementId, txnHash])
   @@index([accountId])

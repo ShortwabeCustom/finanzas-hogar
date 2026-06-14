@@ -8,34 +8,36 @@ import Header from "@/components/layout/Header";
 import Sheet from "@/components/ui/Sheet";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { personalCardSchema, type PersonalCardInput } from "@/lib/validations";
+import CreditAdvisorPanel from "@/components/personal/cards/CreditAdvisorPanel";
+import CreditCalendar from "@/components/personal/cards/CreditCalendar";
+import CreditCardAdviceBadge from "@/components/personal/cards/CreditCardAdviceBadge";
+import type {
+  CreditAdvisorAlert,
+  CreditAdvisorRecommendation,
+  MonthCalendar,
+  CardCalendarEntry,
+} from "@/lib/financial/credit-card-calendar";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const BANK_COLORS: Record<string, string> = {
-  BBVA: "#004990",
-  Banorte: "#e30613",
-  Santander: "#ec0000",
-  HSBC: "#db0011",
-  Citibanamex: "#003087",
-  Scotiabank: "#ec111a",
-  Inbursa: "#0033a0",
-  Hey: "#ff6b00",
-  "Nu Bank": "#820ad1",
-  Nu: "#820ad1",
-  Liverpool: "#cc0000",
-  "Banco Azteca": "#00a651",
-  Otro: "#6366f1",
+  BBVA: "#004990", Banorte: "#e30613", Santander: "#ec0000", HSBC: "#db0011",
+  Citibanamex: "#003087", Scotiabank: "#ec111a", Inbursa: "#0033a0",
+  Hey: "#ff6b00", "Nu Bank": "#820ad1", Nu: "#820ad1", Liverpool: "#cc0000",
+  "Banco Azteca": "#00a651", Otro: "#6366f1",
 };
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
-  CREDIT_CARD: "Crédito",
-  DEBIT_CARD: "Débito",
-  BANK_ACCOUNT: "Cuenta bancaria",
+  CREDIT_CARD: "Crédito", DEBIT_CARD: "Débito", BANK_ACCOUNT: "Cuenta bancaria",
 };
 
 const SOURCE_TYPE_COLORS: Record<string, string> = {
   CREDIT_CARD: "bg-purple-100 text-purple-700",
-  DEBIT_CARD: "bg-sky-100 text-sky-700",
+  DEBIT_CARD:  "bg-sky-100 text-sky-700",
   BANK_ACCOUNT: "bg-green-100 text-green-700",
 };
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PersonalCard {
   id: string;
@@ -49,6 +51,15 @@ interface PersonalCard {
   _count: { payments: number };
 }
 
+interface CalendarData {
+  today: string;
+  alerts: CreditAdvisorAlert[];
+  recommendations: CreditAdvisorRecommendation[];
+  calendar: MonthCalendar[];
+  cards: Omit<CardCalendarEntry, "id">[];
+  emptyState: boolean;
+}
+
 const EMPTY_CARD_VALUES = {
   bankName: "", cardName: "", last4Digits: "",
   paymentSourceType: "CREDIT_CARD" as const,
@@ -57,11 +68,16 @@ const EMPTY_CARD_VALUES = {
 
 const ordinalDay = (d: number) => `${d}°`;
 
+function fmtDate(iso: string): string {
+  const [, m, d] = iso.split("-");
+  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${parseInt(d)} ${months[parseInt(m) - 1]}`;
+}
+
+// ─── CardForm ─────────────────────────────────────────────────────────────────
+
 function CardForm({
-  defaultValues,
-  onSubmit,
-  onCancel,
-  isEdit,
+  defaultValues, onSubmit, onCancel, isEdit,
 }: {
   defaultValues?: Partial<PersonalCardInput & { id: string }>;
   onSubmit: (data: PersonalCardInput) => Promise<void>;
@@ -69,11 +85,7 @@ function CardForm({
   isEdit?: boolean;
 }) {
   const {
-    register,
-    handleSubmit,
-    control,
-    setValue,
-    reset,
+    register, handleSubmit, control, setValue, reset,
     formState: { errors, isSubmitting },
   } = useForm<PersonalCardInput>({
     resolver: zodResolver(personalCardSchema) as any,
@@ -90,7 +102,6 @@ function CardForm({
 
   const sourceType = useWatch({ control, name: "paymentSourceType" });
   const showDayFields = sourceType === "CREDIT_CARD";
-
   const limpiarCampos = useLimpiarCampos(reset, EMPTY_CARD_VALUES);
 
   useEffect(() => {
@@ -105,7 +116,6 @@ function CardForm({
     });
   }, [defaultValues, reset]);
 
-  // Reset closing/due day to 0 when not credit card
   useEffect(() => {
     if (!showDayFields) {
       setValue("closingDay", 0);
@@ -116,8 +126,6 @@ function CardForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
       <div className="grid grid-cols-2 gap-4">
-
-        {/* Tipo */}
         <div className="col-span-2">
           <label className="label">Tipo de medio de pago *</label>
           <select className="input" {...register("paymentSourceType")}>
@@ -127,26 +135,19 @@ function CardForm({
           </select>
         </div>
 
-        {/* Banco */}
         <div className="col-span-2">
           <label className="label">Banco *</label>
-          <input
-            className="input"
-            placeholder="Ej: BBVA, Santander, Nu Bank..."
-            list="bank-suggestions"
-            {...register("bankName")}
-          />
+          <input className="input" placeholder="Ej: BBVA, Santander, Nu Bank..." list="bank-suggestions" {...register("bankName")} />
           <datalist id="bank-suggestions">
-            {Object.keys(BANK_COLORS).filter((b) => b !== "Otro").map((b) => (
-              <option key={b} value={b} />
-            ))}
+            {Object.keys(BANK_COLORS).filter(b => b !== "Otro").map(b => <option key={b} value={b} />)}
           </datalist>
           {errors.bankName && <p className="mt-1 text-xs text-red-600">{errors.bankName.message}</p>}
         </div>
 
-        {/* Nombre */}
         <div className="col-span-2">
-          <label className="label">{sourceType === "BANK_ACCOUNT" ? "Nombre de la cuenta *" : "Nombre de la tarjeta *"}</label>
+          <label className="label">
+            {sourceType === "BANK_ACCOUNT" ? "Nombre de la cuenta *" : "Nombre de la tarjeta *"}
+          </label>
           <input
             className="input"
             placeholder={sourceType === "BANK_ACCOUNT" ? "Ej: Cuenta nómina, Ahorro..." : "Ej: Azul, Oro, Débito nómina..."}
@@ -155,22 +156,14 @@ function CardForm({
           {errors.cardName && <p className="mt-1 text-xs text-red-600">{errors.cardName.message}</p>}
         </div>
 
-        {/* Últimos 4 dígitos */}
         <div>
           <label className="label">Últimos 4 dígitos *</label>
-          <input
-            className="input"
-            placeholder="1234"
-            maxLength={4}
-            inputMode="numeric"
-            {...register("last4Digits")}
-          />
+          <input className="input" placeholder="1234" maxLength={4} inputMode="numeric" {...register("last4Digits")} />
           {errors.last4Digits && <p className="mt-1 text-xs text-red-600">{errors.last4Digits.message}</p>}
         </div>
 
         <div />
 
-        {/* Día de corte y límite — solo para tarjetas de crédito */}
         {showDayFields && (
           <>
             <div>
@@ -200,17 +193,20 @@ function CardForm({
   );
 }
 
+// ─── CardItem ─────────────────────────────────────────────────────────────────
+
 function CardItem({
-  card, onEdit, onDelete, onToggle,
+  card, calEntry, onEdit, onDelete, onToggle,
 }: {
   card: PersonalCard;
+  calEntry?: Omit<CardCalendarEntry, "id">;
   onEdit: () => void;
   onDelete: () => void;
   onToggle: () => void;
 }) {
   const bankColor = BANK_COLORS[card.bankName] ?? BANK_COLORS["Otro"];
   const initials = card.bankName.slice(0, 2).toUpperCase();
-  const isCard = card.paymentSourceType === "CREDIT_CARD";
+  const isCredit = card.paymentSourceType === "CREDIT_CARD";
 
   return (
     <div className={`card p-5 group transition-opacity ${!card.active ? "opacity-60" : ""}`}>
@@ -241,14 +237,12 @@ function CardItem({
       {/* Card number */}
       <div className="bg-gray-50 rounded-lg px-3 py-2 mb-4">
         <p className="text-xs text-gray-400 mb-0.5">Terminación</p>
-        <p className="font-mono font-bold text-gray-800 text-lg tracking-widest">
-          •••• {card.last4Digits}
-        </p>
+        <p className="font-mono font-bold text-gray-800 text-lg tracking-widest">•••• {card.last4Digits}</p>
       </div>
 
-      {/* Dates (only for credit/debit cards) */}
-      {isCard && (
-        <div className="grid grid-cols-2 gap-3 mb-4">
+      {/* Dates — credit cards */}
+      {isCredit && (
+        <div className="grid grid-cols-2 gap-3 mb-3">
           <div className="text-center p-2 bg-indigo-50 rounded-lg">
             <p className="text-xs text-indigo-500 font-medium mb-0.5">Corte</p>
             <p className="text-lg font-bold text-indigo-700">{ordinalDay(card.closingDay)}</p>
@@ -262,6 +256,35 @@ function CardItem({
         </div>
       )}
 
+      {/* Calendar data — credit cards only */}
+      {isCredit && calEntry && (
+        <div className="space-y-2 mb-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-400">Próximo corte</span>
+            <span className="font-medium text-gray-700">{fmtDate(calEntry.nextClosingDate)}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-400">Pagar antes del</span>
+            <span className="font-medium text-gray-700">{fmtDate(calEntry.pendingDueDate)}</span>
+          </div>
+          {(calEntry.alertLevel === "best_moment" || calEntry.alertLevel === "normal") && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-400">Mejor consumo</span>
+              <span className="font-medium text-green-600">
+                {fmtDate(calEntry.bestWindowStart)} – {fmtDate(calEntry.bestWindowEnd)}
+              </span>
+            </div>
+          )}
+          <div className="pt-1">
+            <CreditCardAdviceBadge
+              alertLevel={calEntry.alertLevel}
+              microcopy={calEntry.adviceMicrocopy}
+              compact
+            />
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       <div className="flex items-center justify-between">
         <span className="text-xs text-gray-400">
@@ -271,7 +294,7 @@ function CardItem({
           <button
             onClick={onToggle}
             className={`p-1.5 rounded-lg transition-colors text-gray-400 ${card.active ? "hover:text-amber-600 hover:bg-amber-50" : "hover:text-green-600 hover:bg-green-50"}`}
-            title={card.active ? "Desactivar" : "Activar"}
+            aria-label={card.active ? `Desactivar tarjeta ${card.bankName} ${card.last4Digits}` : `Activar tarjeta ${card.bankName} ${card.last4Digits}`}
           >
             {card.active ? (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -286,7 +309,7 @@ function CardItem({
           <button
             onClick={onEdit}
             className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-            title="Editar"
+            aria-label={`Editar tarjeta ${card.bankName} ${card.last4Digits}`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -295,7 +318,7 @@ function CardItem({
           <button
             onClick={onDelete}
             className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-            title="Eliminar"
+            aria-label={`Eliminar tarjeta ${card.bankName} ${card.last4Digits}`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -307,6 +330,56 @@ function CardItem({
   );
 }
 
+// ─── Calendar section ─────────────────────────────────────────────────────────
+
+function CalendarSection({ calData, loading }: { calData: CalendarData | null; loading: boolean }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="mt-8">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition-colors group"
+        aria-expanded={open}
+        aria-controls="credit-calendar-panel"
+      >
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span className="text-sm font-semibold text-gray-700">Calendario de crédito</span>
+          {calData && !calData.emptyState && (
+            <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
+              {calData.cards.length} tarjeta{calData.cards.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+        <svg
+          className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div id="credit-calendar-panel" className="card p-4 mt-2">
+          <CreditCalendar
+            calendars={calData?.calendar ?? []}
+            today={calData?.today ?? new Date().toISOString().slice(0, 10)}
+            loading={loading}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function PersonalCardsPage() {
   const [cards, setCards] = useState<PersonalCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -317,6 +390,24 @@ export default function PersonalCardsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
+  const [calData, setCalData] = useState<CalendarData | null>(null);
+  const [calLoading, setCalLoading] = useState(true);
+
+  const fetchCalendar = useCallback(async () => {
+    setCalLoading(true);
+    try {
+      const res = await fetch("/api/personal/cards/calendar?months=3");
+      if (res.ok) {
+        const data = await res.json();
+        setCalData(data);
+      }
+    } catch {
+      // calendar is non-critical — fail silently
+    } finally {
+      setCalLoading(false);
+    }
+  }, []);
+
   const fetchCards = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`/api/personal/cards?active=${showAll ? "false" : "true"}`);
@@ -325,7 +416,23 @@ export default function PersonalCardsPage() {
     setLoading(false);
   }, [showAll]);
 
-  useEffect(() => { fetchCards(); }, [fetchCards]);
+  useEffect(() => {
+    fetchCards();
+    fetchCalendar();
+  }, [fetchCards, fetchCalendar]);
+
+  // Match calendar entries to card objects by bankName + last4Digits
+  const calEntryByCard = useCallback(
+    (card: PersonalCard): Omit<CardCalendarEntry, "id"> | undefined => {
+      if (!calData || card.paymentSourceType !== "CREDIT_CARD") return undefined;
+      return calData.cards.find(
+        e => e.bankName === card.bankName && e.last4Digits === card.last4Digits
+      );
+    },
+    [calData]
+  );
+
+  const hasCreditCards = cards.some(c => c.paymentSourceType === "CREDIT_CARD" && c.active);
 
   async function handleSubmit(data: PersonalCardInput) {
     setError(null);
@@ -347,6 +454,7 @@ export default function PersonalCardsPage() {
     setShowForm(false);
     setEditing(null);
     fetchCards();
+    fetchCalendar();
   }
 
   async function handleDelete() {
@@ -358,6 +466,7 @@ export default function PersonalCardsPage() {
       setError(typeof body.error === "string" ? body.error : "Error al eliminar");
     } else {
       fetchCards();
+      fetchCalendar();
     }
     setDeleteLoading(false);
     setDeleting(null);
@@ -369,13 +478,9 @@ export default function PersonalCardsPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        bankName: card.bankName,
-        cardName: card.cardName,
-        last4Digits: card.last4Digits,
-        paymentSourceType: card.paymentSourceType,
-        closingDay: card.closingDay,
-        dueDay: card.dueDay,
-        active: !card.active,
+        bankName: card.bankName, cardName: card.cardName, last4Digits: card.last4Digits,
+        paymentSourceType: card.paymentSourceType, closingDay: card.closingDay,
+        dueDay: card.dueDay, active: !card.active,
       }),
     });
     if (!res.ok) {
@@ -383,10 +488,11 @@ export default function PersonalCardsPage() {
       setError(typeof body.error === "string" ? body.error : "Error al actualizar");
     } else {
       fetchCards();
+      fetchCalendar();
     }
   }
 
-  const activeCount = cards.filter((c) => c.active).length;
+  const activeCount = cards.filter(c => c.active).length;
 
   return (
     <div>
@@ -395,7 +501,7 @@ export default function PersonalCardsPage() {
         subtitle="Administra tus tarjetas y cuentas bancarias para asociarlas a tus pagos"
         actions={
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowAll((v) => !v)} className="btn-secondary text-sm">
+            <button onClick={() => setShowAll(v => !v)} className="btn-secondary text-sm">
               {showAll ? "Solo activas" : "Ver todas"}
             </button>
             <button
@@ -408,8 +514,16 @@ export default function PersonalCardsPage() {
         }
       />
 
+      {/* Credit advisor panel */}
+      <CreditAdvisorPanel
+        alerts={calData?.alerts ?? []}
+        recommendations={calData?.recommendations ?? []}
+        loading={calLoading}
+        emptyState={!calLoading && (calData?.emptyState ?? !hasCreditCards)}
+      />
+
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 flex justify-between items-center">
+        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 flex justify-between items-center" role="alert">
           <span>{error}</span>
           <button className="font-medium underline ml-2" onClick={() => setError(null)}>Cerrar</button>
         </div>
@@ -426,7 +540,7 @@ export default function PersonalCardsPage() {
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="animate-spin w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full" />
+          <div className="animate-spin w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full" aria-label="Cargando tarjetas" />
         </div>
       ) : cards.length === 0 ? (
         <div className="card p-12 text-center">
@@ -446,10 +560,11 @@ export default function PersonalCardsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {cards.map((card) => (
+          {cards.map(card => (
             <CardItem
               key={card.id}
               card={card}
+              calEntry={calEntryByCard(card)}
               onEdit={() => { setEditing(card); setShowForm(true); }}
               onDelete={() => setDeleting(card)}
               onToggle={() => handleToggle(card)}
@@ -458,12 +573,15 @@ export default function PersonalCardsPage() {
         </div>
       )}
 
+      {/* Calendar section — collapsible */}
+      {(hasCreditCards || calData?.cards?.length) ? (
+        <CalendarSection calData={calData} loading={calLoading} />
+      ) : null}
+
       <Sheet
         open={showForm}
         onClose={() => { setShowForm(false); setEditing(null); setError(null); }}
-        title={editing
-          ? `Editar — ${editing.bankName} •••• ${editing.last4Digits}`
-          : "Nuevo medio de pago"}
+        title={editing ? `Editar — ${editing.bankName} •••• ${editing.last4Digits}` : "Nuevo medio de pago"}
         size="md"
       >
         <CardForm

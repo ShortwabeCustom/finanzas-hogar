@@ -38,23 +38,36 @@ function txnHash(
 
 export async function importStatement(
   payload: ImportStatementPayload,
-  userId: string
+  userId: string,
+  scope: "PERSONAL" | "HOUSEHOLD" = "PERSONAL"
 ): Promise<ImportSummary> {
   const errors: string[] = [];
   const totalTransactions = payload.transactions.length;
 
+  // ── 0. Verify userId exists (guards against stale JWTs after DB reseeds) ────
+  const userExists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!userExists) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
   // ── 1. Find-or-create BankAccount ───────────────────────────────────────────
-  // upsert can't filter on nullable fields in compound unique keys, so we use
-  // findFirst + create/update. The DB also has a partial unique index covering
-  // the null-cardNumber case (applied separately via raw SQL).
-  let account = await prisma.bankAccount.findFirst({
-    where: {
-      userId,
-      bankName: payload.account.bankName,
-      productName: payload.account.productName,
-      cardNumber: payload.account.cardNumber ?? null,
-    },
-  });
+  // For PERSONAL: scoped to userId. For HOUSEHOLD: shared across all users.
+  const accountWhere =
+    scope === "HOUSEHOLD"
+      ? {
+          scope: "HOUSEHOLD" as const,
+          bankName: payload.account.bankName,
+          productName: payload.account.productName,
+          cardNumber: payload.account.cardNumber ?? null,
+        }
+      : {
+          userId,
+          bankName: payload.account.bankName,
+          productName: payload.account.productName,
+          cardNumber: payload.account.cardNumber ?? null,
+        };
+
+  let account = await prisma.bankAccount.findFirst({ where: accountWhere });
 
   if (!account) {
     account = await prisma.bankAccount.create({
@@ -67,6 +80,7 @@ export async function importStatement(
         cardNumber: payload.account.cardNumber ?? null,
         currency: payload.account.currency ?? "MXN",
         type: payload.account.type,
+        scope,
       },
     });
   } else {
