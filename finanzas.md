@@ -2,9 +2,9 @@
 
 **URL:** https://finanzas.torrax.cloud | **Puerto:** 4000 | **Directorio:** `/var/www/finanzas-hogar`
 
-Sistema de control financiero personal y del hogar con importación de documentos (PDF, Excel, XML CFDI, tickets OCR) y plan de recuperación financiera determinístico.
+Sistema de control financiero personal y del hogar con importación de documentos (PDF, Excel, XML CFDI, tickets OCR).
 
-> **Estado (2026-06-13):** n8n removido. WhatsApp desactivado. Pipeline de documentos opera completamente in-process: PDFs Santander Cuenta Corriente parseados sin servicios externos; PDFs escaneados usan OCR/Vision con OpenAI (`gpt-5.4-mini` principal, `gpt-5.5` retry); fallback seguro `gpt-4o-mini` vía `OPENAI_LEGACY_FALLBACK_MODEL` si el modelo principal no está disponible o si `json_schema` estricto no es compatible. `finanzas-processor` ya no es necesario para la importación de estados de cuenta. Importación OCR reparada para usar `max_completion_tokens`, errores HTTP claros y logs sin datos bancarios sensibles. Plan de Recuperación cuadrado contra estados de cuenta: saldos de tarjetas desde `BankStatement`, flujo operativo sin doble conteo de pagos de tarjetas. **Estados de Cuenta del Hogar** añadidos en `/statements` (grupo "Finanzas en Pareja"): `BankAccountScope` separa contextos PERSONAL/HOUSEHOLD; movimientos bancarios compartidos se envían a `Payment` (no `PersonalPayment`); folio `HLD-*`; VIEWER solo lectura. **Ordenamiento de movimientos** en `/personal/statements`: botones de sort en columnas FECHA y CARGO (desktop); control compacto select + flecha (mobile); default fecha DESC; cargos nulos al final; `aria-sort` en `<th>`; build limpio + PM2 restart aplicado.
+> **Estado (2026-08-04 rev3):** Módulo "Plan de Recuperación" removido completamente (2026-08-04). n8n removido. WhatsApp desactivado. Pipeline de documentos opera completamente in-process: PDFs Santander Cuenta Corriente parseados sin servicios externos; PDFs escaneados usan OCR/Vision con OpenAI (`gpt-5.4-mini` principal, `gpt-5.5` retry); fallback seguro `gpt-4o-mini` vía `OPENAI_LEGACY_FALLBACK_MODEL` si el modelo principal no está disponible o si `json_schema` estricto no es compatible. `finanzas-processor` ya no es necesario para la importación de estados de cuenta. Importación OCR reparada para usar `max_completion_tokens`, errores HTTP claros y logs sin datos bancarios sensibles. **Estados de Cuenta del Hogar** añadidos en `/statements` (grupo "Finanzas en Pareja"): `BankAccountScope` separa contextos PERSONAL/HOUSEHOLD; movimientos bancarios compartidos se envían a `Payment` (no `PersonalPayment`); folio `HLD-*`; VIEWER solo lectura. **Ordenamiento de movimientos** en `/personal/statements`: botones de sort en columnas FECHA y CARGO (desktop); control compacto select + flecha (mobile); default fecha DESC; cargos nulos al final; `aria-sort` en `<th>`; build limpio + PM2 restart aplicado. **Mes asignado en estados de cuenta**: el título de mes se calcula desde `periodEnd` (fecha de corte); usuario puede editarlo manualmente con persistencia en DB; opción para restaurar cálculo automático. **Parser Santander tarjeta de crédito** (`santander-credit-pdf.ts`): parser in-process para PDFs Free/ORO/Platinum/AMEX; cero dependencias de OpenAI; extrae período, número de tarjeta, saldos, totales y movimientos directamente del texto del PDF; distingue `+`=cargo vs `-`=abono; elimina notación FX y códigos de autorización de la descripción. **Fix 504 importación PDF**: nginx `proxy_read_timeout` subido a 300s; `export const maxDuration = 300` añadido a la ruta de importación. **Fix SVG sidebar**: ícono banknotes tenía `sweep-flag` ausente en el comando arc (`a.75.75 0 0-.75.75` → `a.75.75 0 0 0-.75.75`); corregido en ambas ocurrencias (ítems "Pagos" y "Mis Pagos"). **Validación PATCH statements**: `PATCH /api/personal/statements/[id]` valida `assignedMonth` en \[1-12\], `assignedYear` en \[2000-2100\] y `assignedMonthSource` en `{"manual","auto"}`; devuelve 400 en caso de valor inválido.
 
 ---
 
@@ -40,6 +40,14 @@ PDF Santander Cuenta Corriente / Nómina
         │
         ├─ parseSantanderPDF()  (in-process, pdf-parse v2)
         │
+PDF Santander Tarjeta de Crédito (Free, ORO, Platinum, AMEX, etc.)
+        │
+        ├─ parseSantanderCreditPDF()  (in-process, sin deps externas)
+        │       ├─ detección: "CARGOS, ABONOS Y COMPRAS REGULARES" + "TARJETA TITULAR"
+        │       ├─ extrae período, tarjeta (últimos 4), producto, saldos, totales
+        │       ├─ parsea sección "NO A MESES" únicamente (excluye diferidos)
+        │       └─ "+" = chargeAmount (cargo al cliente), "-" = creditAmount (pago)
+        │
 PDF escaneado / imagen
         │
         ├─ parseStatementWithVision()  → OpenAI gpt-5.4-mini
@@ -61,7 +69,7 @@ finanzas-hogar API (Next.js)         ← /var/www/finanzas-hogar
 
 **Dos planos de datos paralelos:**
 - **Hogar** — gastos compartidos, despensa, categorías globales, dashboard consolidado
-- **Personal** — pagos propios, tarjetas/cuentas, estados de cuenta bancarios, plan de recuperación
+- **Personal** — pagos propios, tarjetas/cuentas, estados de cuenta bancarios
 
 ---
 
@@ -184,6 +192,9 @@ npm test
 **Datos bancarios**
 - `BankAccount` — `type: AccountType`; `scope BankAccountScope @default(PERSONAL)`; cuentas PERSONAL tienen `@@unique([userId, bankName, productName, cardNumber])`; cuentas HOUSEHOLD se identifican por `(scope, bankName, productName, cardNumber)` sin `userId`; `@@index([scope])`
 - `BankStatement` — período importado; `@@unique([accountId, periodStart, periodEnd])`
+  - `assignedMonth Int?` — mes asignado manualmente (1-12); null = usar cálculo automático (añadido 2026-06-17)
+  - `assignedYear Int?` — año asignado manualmente; null = usar cálculo automático (añadido 2026-06-17)
+  - `assignedMonthSource String? @default("auto")` — `"auto"` = calcular desde `periodEnd`; `"manual"` = usar `assignedMonth`/`assignedYear` (añadido 2026-06-17)
 - `BankTransaction` — deduplicadas por `txnHash`; `@@unique([statementId, txnHash])`; índices en `accountId`, `statementId`, `transactionDate`; relación inversa opcional `personalPayment PersonalPayment?` (PERSONAL, 2026-06-08); relación inversa `payment Payment?` (HOUSEHOLD, 2026-06-13)
 - `FinancialSnapshot` — historial mensual del score; `@@unique([userId, date])` (primer día del mes)
 
@@ -234,7 +245,6 @@ Header requerido: `x-internal-token: <INTERNAL_API_TOKEN>`
 | `/api/internal/categories` | GET | Listar categorías para finanzas-processor |
 | `/api/financial/statements` | POST | Importar estado de cuenta vía OCR pipeline |
 | `/api/financial/sync` | POST | Sincronizar BankTransactions → PersonalPayments |
-| `/api/financial/recovery-plan?months=1\|3\|6` | GET | Plan de recuperación financiera |
 
 ### Rutas de sesión (NextAuth JWT)
 
@@ -260,6 +270,7 @@ Header requerido: `x-internal-token: <INTERNAL_API_TOKEN>`
 | `/api/personal/cards/[id]` | PATCH / DELETE | Editar / eliminar tarjeta |
 | `/api/personal/cards/calendar` | GET | Calendario inteligente de crédito; query param `months` (1-12, default 3); devuelve `today`, `alerts`, `recommendations`, `calendar`, `cards`, `emptyState`; solo tarjetas activas `CREDIT_CARD`; no expone IDs internos |
 | `/api/personal/statements` | GET | Listar estados de cuenta del usuario |
+| `/api/personal/statements/[id]` | PATCH | Actualizar mes asignado al estado de cuenta (`assignedMonth`, `assignedYear`, `assignedMonthSource`) |
 | `/api/personal/statements/[id]` | DELETE | Eliminar un estado de cuenta del usuario y sus movimientos bancarios importados |
 | `/api/personal/statements/import` | POST | Importar PDF (in-process Santander o fallback OpenAI) o XML CFDI-ECB Santander (in-process) |
 | `/api/personal/statements/[id]/move` | PATCH | Mover un BankStatement a otra BankAccount; opcionalmente fusiona periodo equivalente evitando duplicados por `txnHash` |
@@ -401,47 +412,16 @@ Respuesta:
 | `src/lib/financial/import.ts` | `importStatement(payload, userId, scope)` — valida userId, upsert cuenta (PERSONAL: filtra por `userId`; HOUSEHOLD: filtra por `scope+bankName+productName+cardNumber`), dedup SHA-256, bulk-insert transacciones; `scope` acepta `"PERSONAL"` (default) \| `"HOUSEHOLD"` |
 | `src/lib/financial/parsers/santander-ecb.ts` | `isSantanderECB()` + `parseSantanderECB()` — parser CFDI v4 con addenda ECB; extrae movimientos, clasifica cargo/abono, excluye nodos fiscales |
 | `src/lib/financial/parsers/santander-pdf.ts` | `isSantanderCheckingPDF()` + `parseSantanderPDF()` — parser in-process para PDFs de Cuenta Corriente/Nómina Santander; agrupa líneas por bloque de fecha, usa balance acumulado para determinar cargo/abono, soporta múltiples sub-cuentas por PDF |
+| `src/lib/financial/parsers/santander-credit-pdf.ts` | `isSantanderCreditPDF()` + `parseSantanderCreditPDF()` — parser in-process para PDFs de tarjetas de crédito Santander (Free, ORO, Platinum, AMEX); detecta sección "CARGOS, ABONOS Y COMPRAS REGULARES"; extrae período, últimos 4 dígitos de tarjeta, nombre de producto, saldos, totales; interpreta "+" como cargo y "-" como abono; limpia codigos FX (`20.00 USD TC 17.5415`) y códigos de autorización (`ISD`, `CPA`, `TPT`, `ANE`) de la descripción; excluye la sección de diferidos a meses; cero dependencias externas |
 | `src/lib/financial/parsers/vision-ocr.ts` | `parseStatementWithVision()` — valida `pdftoppm`, renderiza PDFs escaneados, envía imágenes a OpenAI Vision con Structured Outputs (`json_schema`, `strict: true`, `additionalProperties: false`), usa `gpt-5.4-mini` como modelo principal, `gpt-5.5` como retry y `gpt-4o-mini` como fallback seguro; valida manualmente con Zod cuando usa `json_object`; requiere `OPENAI_API_KEY` y `poppler-utils` |
 | `src/lib/financial/parsers/ai-fallback.ts` | `extractPdfText()` (pdf-parse v2) + `parseWithAI()` — fallback texto legacy para PDFs digitales no reconocidos; envía texto a OpenAI `gpt-4o-mini` con `response_format: json_object`; retorna `ImportStatementPayload`; requiere `OPENAI_API_KEY` |
 | `src/lib/financial/sync.ts` | `syncBankToPersonalPayments()` — batch-lookup sin N+1, auto-categorización, folio `BNK-<hash16>`; exporta `cleanName()` y `autoCategory()` para reutilización; ahora también persiste `bankTransactionId`, `sourceStatementId`, `importedFromBank: true` |
 | `src/lib/financial/credit-card-calendar.ts` | `buildCreditCardCalendar(cards, options)` — calendario inteligente de crédito; calcula próximo corte, fecha límite de pago (respetando si `dueDay <= closingDay` → mes siguiente), ventana óptima de consumo (D+1 a D+7 post-corte), ventana de riesgo (D-7 a D-0 pre-corte), nivel de alerta (`overdue \| pay_today \| warning_d1/d3/d7 \| risk_zone \| best_moment \| normal`) y microcopy; ajusta días inválidos con `safeDate()` para meses cortos; genera eventos de calendario por mes |
-| `src/lib/financial/recovery-plan.ts` | Score financiero 0-100, plan priorizado, proyección 3 meses, insights; desde 2026-06-08 cuadra saldos de tarjetas contra `BankStatement` y separa flujo operativo de pagos internos a tarjetas |
 | `src/lib/validations.ts` | Schemas Zod de todos los formularios y rutas API |
 | `src/lib/utils.ts` | `generateFolio()` (crypto.randomBytes), formateadores MXN/fecha, label maps |
 | `src/lib/receipt.ts` | `resolveReceiptUrl()` — convierte `/uploads/…` al endpoint `/api/receipt/[file]` |
 | `src/lib/category-visuals.tsx` | Íconos y colores por categoría para UI |
 | `src/lib/productMetrics.ts` | Métricas de productos de despensa |
-
-### Plan de Recuperación (`recovery-plan.ts`) — lógica v6
-
-1. **Score 0-100** — flujo libre (0-40 pts) + deuda vencida (0-35 pts) + urgencia (0-25 pts)
-2. **Resumen** — ingreso/egreso promedio, totales vencido/pendiente/dueIn7/dueIn15, flujo libre estimado
-3. **Flujo operativo bancario** — cuando hay `BankTransaction`, calcula ingresos/egresos desde estados de cuenta; excluye pagos internos a tarjetas (`CARGO PAGO TARJETA CREDITO`, `PAGO DE TARJETA DE CREDITO`, etc.) para evitar doble conteo
-4. **Saldos de tarjetas** — lee `BankAccount.type = CREDIT` con `BankStatement`; usa `closingBalance` si existe, o reconstruye saldo con `saldo previo + totalCharges - totalCredits`; si el XML no trae saldo inicial/final, marca calidad parcial con `BankStatement.closingBalance`
-5. **Fechas límite de tarjeta** — mientras no haya `PersonalCard.dueDay` vinculado, estima vencimiento como `cutDate + 20 días` y lo declara en `reason`/insights
-6. **Matriz priorizada** — P1 vencidos manuales y saldos de tarjeta vencidos → P2 ≤7 días → P3 8-15 días recurrentes → P4 resto (top 20 + saldos de tarjeta pendientes)
-7. **Proyección 3 meses** — `remainingDebt` vs `cumulativePaid` hasta quedar al corriente
-8. **Historial** — `FinancialSnapshot` upsert mensual esperado antes de responder (evita carreras de request)
-9. **Recortes sugeridos** — top 5 categorías variables con reducción del 30%, usando gastos bancarios si existen
-10. **Insights** — tarjetas `risk | warning | opportunity | info` por reglas determinísticas; incluye insight de deuda total en tarjetas
-
-**Cuadre verificado 2026-06-08 — usuario Alexis (`381f9267-3fdc-4d5e-adf2-66f70b606167`), últimos 3 meses:**
-
-| Métrica | Valor |
-|---------|-------|
-| Ingreso mensual promedio | `$43,705.27` |
-| Egreso mensual promedio | `$36,312.32` |
-| Flujo libre | `$7,392.95` |
-| Capacidad de pago | `$6,892.95` |
-| Total vencido | `$36,396.96` |
-| Total pendiente | `$3,366.11` |
-| Deuda total tarjetas | `$39,763.07` |
-
-| Prioridad | Fuente | Tarjeta | Saldo | Estado | Fecha límite estimada |
-|-----------|--------|---------|-------|--------|------------------------|
-| 1 | `BankStatement` | Santander LikeU Oro 7784 | `$8,363.19` | `OVERDUE` | `2026-06-01` |
-| 2 | `BankStatement` | Santander AMEX 3037 | `$28,033.77` | `OVERDUE` | `2026-06-05` |
-| 3 | `BankStatement` | Santander Free 3937 | `$3,366.11` | `PENDING` | `2026-06-26` |
 
 ---
 
@@ -454,6 +434,7 @@ Respuesta:
 **Fuentes soportadas (in-process, sin processor):**
 - XML CFDI-ECB Santander — `parseSantanderECB()` en `src/lib/financial/parsers/santander-ecb.ts`
 - PDF Santander Cuenta Corriente / Nómina — `parseSantanderPDF()` en `src/lib/financial/parsers/santander-pdf.ts`
+- PDF Santander Tarjeta de Crédito (Free, ORO, Platinum, AMEX) — `parseSantanderCreditPDF()` en `src/lib/financial/parsers/santander-credit-pdf.ts` ← nuevo 2026-06-17
 - PDF escaneado / imagen — `parseStatementWithVision()` vía OpenAI Vision (`gpt-5.4-mini` principal, `gpt-5.5` retry) en `src/lib/financial/parsers/vision-ocr.ts`
 - PDF digital otros bancos — fallback texto legacy `parseWithAI()` vía OpenAI `gpt-4o-mini` en `src/lib/financial/parsers/ai-fallback.ts`
 
@@ -484,8 +465,6 @@ Respuesta:
     │   ├── /personal/categories      Mis Finanzas · Mis categorías
     │   ├── /personal/cards           Mis Finanzas · Tarjetas y cuentas
     │   └── /personal/statements      Mis Finanzas · Estados de cuenta personales
-    ├── /financial
-    │   └── /financial/recovery-plan  Mis Finanzas · Plan de recuperación
     └── /users                        Admin · Gestión de usuarios (solo ADMIN)
 ```
 
@@ -493,7 +472,7 @@ Respuesta:
 
 **Finanzas en Pareja** (ícono corazón): Dashboard · Pagos · Despensa · Categorías · Estados de Cuenta
 
-**Mis Finanzas** (ícono persona): Mi Dashboard · Mis Pagos · Mis Categorías · Mis Tarjetas · Estados de Cuenta · Plan de Recuperación
+**Mis Finanzas** (ícono persona): Mi Dashboard · Mis Pagos · Mis Categorías · Mis Tarjetas · Estados de Cuenta
 
 **Administración** (solo ADMIN): Usuarios
 
@@ -590,7 +569,10 @@ Botón "Importar PDF / XML" → StatementImportCard (drag-and-drop)
        │         └─ fallback legacy opcional gpt-4o-mini solo si el principal no está disponible
        ├─ isSantanderCheckingPDF() = true
        │    └─ parseSantanderPDF() → importStatement()  [sin deps externas]
-       └─ isSantanderCheckingPDF() = false
+       ├─ isSantanderCreditPDF() = true
+       │    └─ parseSantanderCreditPDF() → importStatement()  [sin deps externas]
+       │         (cubre Free, ORO, Platinum, AMEX; detecta "CARGOS, ABONOS Y COMPRAS REGULARES")
+       └─ ninguno de los anteriores
             └─ parseWithAI() → OpenAI gpt-4o-mini legacy texto → importStatement()
                  (requiere OPENAI_API_KEY; si falta, devuelve 503 descriptivo)
 
@@ -693,22 +675,6 @@ Seguridad:
   - Logs sin datos bancarios sensibles
 ```
 
-### Plan de Recuperación (`/financial/recovery-plan`)
-```
-Toggle: "Analizar últimos: 1 / 3 / 6 meses"
-→ Score financiero (0-100) con desglose y tendencia
-→ Evolución del score: LineChart histórico (requiere ≥2 meses)
-→ 6 KPI Cards: ingreso prom · egreso prom · vencido · pendiente · flujo libre · capacidad de pago
-→ 2 BarCharts: ingreso vs egreso | deuda por urgencia
-→ Proyección AreaChart: deuda restante (rojo) vs pagos acumulados (verde)
-→ Insights: risk(⚠) | warning(!) | opportunity(↑) | info(i)
-→ Tabla "Qué pagar primero": ordenable por prioridad/monto/fecha; badge P1-P5; acción recomendada
-→ Filas `PersonalPayment`: botón "Marcar pagado" → ConfirmModal → PATCH /mark-paid → recarga plan
-→ Filas `BankStatement`: badge "Saldo de corte"; no se marca pagado desde la tabla porque representa deuda calculada del estado de cuenta
-→ Tarjetas "Qué recortar": categorías variables con reducción sugerida del 30%
-→ Aviso de calidad: si un XML no trae `closingBalance`, informa que el saldo fue reconstruido con cargos y abonos y recomienda importar PDF
-```
-
 ---
 
 ## Matriz de módulos
@@ -724,7 +690,6 @@ Toggle: "Analizar últimos: 1 / 3 / 6 meses"
 | Mis Pagos | Individual | Registro de gastos personales | "+ Nuevo pago" | Ícono + "Crea tu primer pago" | `payment_created` |
 | Estados de Cuenta (Personal) | Individual | Ver movimientos bancarios personales; enviar a Mis Pagos | Seleccionar período | "Importa estados de cuenta" | `statement_import_success` |
 | Estados de Cuenta (Hogar) | Admin/miembro | Centralizar movimientos bancarios compartidos; enviar a Pagos del Hogar | Seleccionar período | "Importa el primer estado de cuenta del hogar" | `statement_import_success` |
-| Plan de Recuperación | Individual endeudado | Priorizar pagos con flujo real | "Marcar pagado" | "No hay información suficiente" | `payment_marked_paid` + mejora de score |
 | Usuarios | ADMIN | Control de accesos | Crear usuario | Improbable | # usuarios activos |
 
 ### Patrones UX transversales
@@ -734,7 +699,7 @@ Toggle: "Analizar últimos: 1 / 3 / 6 meses"
 | Carga | Spinner circular indigo `animate-spin` centrado (GAP: sin skeleton) |
 | CRUD | Sheet lateral crear/editar · ConfirmDialog eliminar |
 | Error inline | Banner `bg-red-50 border-red-200` + botón Cerrar |
-| Éxito | Solo texto transitorio en Recovery Plan (GAP: sin toast global) |
+| Éxito | Toast global `react-hot-toast` (GAP: por implementar) |
 | Validación | Zod + RHF · error bajo cada campo en `text-xs text-red-600` |
 | Tabla responsive | `hidden sm:block` desktop · `sm:hidden` mobile cards |
 | Totales | `<tfoot>` con suma de montos + conteo de registros |
@@ -763,15 +728,6 @@ Toggle: "Analizar últimos: 1 / 3 / 6 meses"
 | PENDING | `yellow-100` | `yellow-800` |
 | OVERDUE | `red-100` | `red-800` |
 | CANCELLED | `gray-100` | `gray-600` |
-
-**Estados de riesgo financiero (Recovery Plan)**
-
-| Status | Score | BG | Text | Dot |
-|--------|-------|----|------|-----|
-| critical | < 25 | `red-100` | `red-800` | `red-500` |
-| tight | 25-44 | `amber-100` | `amber-800` | `amber-500` |
-| stable | 45-64 | `blue-100` | `blue-800` | `blue-500` |
-| healthy | ≥ 65 | `green-100` | `green-800` | `green-500` |
 
 **Urgencia de vencimientos (dashboard)**
 
@@ -821,10 +777,6 @@ Toggle: "Analizar últimos: 1 / 3 / 6 meses"
 | BarChart flujo | Dashboard | Gastado `#ef4444` vs Recibido `#06b6d4`; granularity dinámica |
 | Treemap categorías | Dashboard | Paleta 20 colores indexada + hash por nombre |
 | BarChart horizontal | Dashboard | Por método de pago, Cell con color específico |
-| AreaChart proyección | Recovery | Deuda (rojo) vs Pagado (verde); ReferenceLine al mes 0 |
-| LineChart score | Recovery | Línea indigo; dots coloreados por rango; 5 bandas de fondo |
-| BarChart overview | Recovery | Ingreso(cyan) vs Egreso(orange), barSize=56 |
-| BarChart deuda | Recovery | Vencido(red)/Pendiente(amber)/Próx.7d(purple) |
 
 ### Responsive
 
@@ -834,7 +786,7 @@ Toggle: "Analizar últimos: 1 / 3 / 6 meses"
 | `≥ 640px` | Tabla desktop, filtros 2col |
 | `≥ 768px` | Sidebar fijo colapsable |
 | `≥ 1024px` | KPI 3col, charts 2col, split panel statements |
-| `≥ 1280px` | KPI 6col (dashboard y recovery plan) |
+| `≥ 1280px` | KPI 6col (dashboard) |
 
 ---
 
@@ -855,13 +807,10 @@ export function trackEvent(eventName: string, params?: Record<string, unknown>) 
 | 1 | `login_success` | signIn OK | `(auth)/login/page.tsx` | `method: "credentials"` |
 | 2 | `dashboard_view` | Datos cargados | `(app)/dashboard/page.tsx` | `time_filter`, `has_overdue`, `overdue_count` |
 | 3 | `payment_created` | POST/PATCH exitoso | `payments/page.tsx`, `personal/payments/page.tsx` | `scope`, `has_receipt`, `payment_method`, `amount_bucket` |
-| 4 | `payment_marked_paid` | mark-paid OK | `recovery-plan/page.tsx` | `priority`, `from_recovery_plan: true` |
-| 5 | `statement_import_started` | Inicio upload PDF | Futuro UI importación | `file_type`, `bank_name` |
-| 6 | `statement_import_success` | Sync completado | Backend / futuro UI | `period`, `transaction_count` |
-| 7 | `recovery_plan_viewed` | Plan cargado | `recovery-plan/page.tsx` | `financial_status`, `score`, `months_analyzed` |
-| 8 | `recovery_priority_clicked` | Click "Marcar pagado" | `recovery-plan/page.tsx` | `priority`, `status`, `recommended_action` |
-| 9 | `financial_filter_used` | Cambio de filtro | `dashboard/page.tsx`, pagos | `filter_type`, `value`, `module` |
-| 10 | `chart_interaction` | Hover en chart | Dashboard, Recovery | `chart_type`, `module` |
+| 4 | `statement_import_started` | Inicio upload PDF | Futuro UI importación | `file_type`, `bank_name` |
+| 5 | `statement_import_success` | Sync completado | Backend / futuro UI | `period`, `transaction_count` |
+| 6 | `financial_filter_used` | Cambio de filtro | `dashboard/page.tsx`, pagos | `filter_type`, `value`, `module` |
+| 7 | `chart_interaction` | Hover en chart | Dashboard | `chart_type`, `module` |
 
 > Para `amount_bucket`: `0-500 | 500-2000 | 2000-10000 | 10000+` — no registrar montos exactos.
 
@@ -888,13 +837,10 @@ export function trackEvent(eventName: string, params?: Record<string, unknown>) 
 |----|------|--------|---------|
 | QW-03 | Toast/Snackbar global | Todos | Implementar `react-hot-toast` con auto-dismiss 3s para CRUD feedback |
 | UX-02 | Paginación en tablas | Pagos/Statements | Sin límite de registros; agregar `limit/offset` con indicador de total |
-| UX-04 | "Marcar pagado" desde Mis Pagos | Mis Pagos | Solo disponible en Recovery Plan; agregar acción rápida en tabla |
 | AC-05 | `role="alert"` en errores | Formularios | Banners de error no anunciados a screen readers |
-| AN-03 | Implementar eventos 1-4 | Core | login, dashboard, payment_created, payment_marked_paid |
-| AN-04 | Implementar evento 7 | Recovery | `recovery_plan_viewed` |
+| AN-03 | Implementar eventos 1-3 | Core | login, dashboard, payment_created |
 | UI-01 | Skeleton loading | Todos | Reemplazar spinner por skeleton screens para reducir layout shift |
 | RK-03 | Carga sin paginación | Pagos | Con muchos registros puede saturar cliente |
-| RK-04 | Score con datos incompletos | Recovery | Inferencia por nombre de categoría puede clasificar ingresos como gastos |
 
 ### Prioridad 🟡 Media
 
@@ -924,7 +870,6 @@ export function trackEvent(eventName: string, params?: Record<string, unknown>) 
 | AC-06 | Skip link "Ir al contenido" | Global |
 | AC-07 | `aria-live="polite"` en loading | Todos |
 | AC-10 | `prefers-reduced-motion` | Global |
-| RK-09 | Snapshot manual vs. automático | Recovery |
 
 ### Orden de sprint recomendado
 
@@ -951,15 +896,213 @@ Sprint 4 — Polish UI
 | **Reemplazar n8n:** evaluar Baileys standalone, Evolution API o webhook Twilio para WhatsApp | P1 |
 | **Reactivar ingesta WhatsApp** con el nuevo canal | P2 |
 | Resumen ejecutivo con IA (Claude Haiku, 3 bullets) | P3 |
-| Chat CFO personal — panel lateral de preguntas sobre el plan | P3 |
+| Chat CFO personal — panel lateral de preguntas sobre pagos | P3 |
 | Notificación WhatsApp cuando pago llega a 3 días de vencimiento | P4 |
-| Alerta crítica WhatsApp si `financialStatus === "critical"` | P4 |
-| Caché del endpoint recovery-plan (5 min TTL con `unstable_cache`) | P5 |
+| Alerta crítica WhatsApp si hay pagos vencidos | P4 |
 | Test E2E (Playwright) | P5 |
 
 ---
 
 ## Historial de cambios
+
+### 2026-08-04 — Eliminación de módulo "Plan de Recuperación"
+
+#### Cambio
+
+Se removió completamente el módulo "Plan de Recuperación" del sistema:
+
+**Archivos eliminados:**
+- `src/lib/financial/recovery-plan.ts` (1,043 líneas) — librería de lógica del score, matriz priorizada, proyecciones e insights
+- `src/app/(app)/financial/recovery-plan/page.tsx` (1,067 líneas) — página UI con gráficas, tabla de prioridades y análisis
+- `src/app/api/financial/recovery-plan/route.ts` — endpoint GET que retorna `RecoveryPlan`
+
+**Componentes actualizados:**
+- `src/components/layout/Sidebar.tsx` — removido item "Plan de Recuperación" de `personalItems`
+
+**Documentación actualizada:**
+- Removidas referencias a recovery-plan de índice, API routes, librerías internas
+- Removidas rutas `/financial/recovery-plan` del sitemap
+- Removida sección de flujos principales del plan
+- Removida entrada de la matriz de módulos
+- Removidas referencias de eventos analíticos y charts del Recovery
+- Actualizados pendientes técnicos relacionados
+
+**Alcance:**
+- Commit `0ae8feb`: 2,147 líneas eliminadas
+- Cero cambios en tablas de datos, schemas Prisma o bases de datos
+- Cero cambios en APIs de Mis Pagos, Mis Tarjetas, o Estados de Cuenta
+
+#### Motivo
+
+Simplificación del sistema y reducción de complejidad. Los usuarios pueden gestionar pagos desde "Mis Pagos" y seguimiento bancario desde "Estados de Cuenta" sin necesidad de un módulo de análisis predictivo centralizado.
+
+---
+
+### 2026-06-17 — Fix errores SVG en sidebar (sweep-flag ausente en arc)
+
+#### Problema
+
+Dos errores en consola del navegador en todas las páginas que muestran el sidebar:
+
+```
+Error: <path> attribute d: Expected arc flag ('0' or '1'),
+"….5H21a.75.75 0 0-.75.75v.75m0 0H…"
+```
+
+#### Causa
+
+El comando arc SVG tiene 7 parámetros: `a rx ry x-rotation large-arc-flag sweep-flag dx dy`.
+
+El ícono de billetes (Heroicons `banknotes`) en los ítems "Pagos" y "Mis Pagos" del sidebar tenía `a.75.75 0 0-.75.75` — solo 6 parámetros. El `sweep-flag` (tercer flag, obligatorio) estaba ausente. Al parsear `0-.75`, Chrome esperaba un flag `0` o `1` y encontró `-.75` (número negativo), lanzando el error.
+
+#### Cambios aplicados
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/components/layout/Sidebar.tsx` | `a.75.75 0 0-.75.75` → `a.75.75 0 0 0-.75.75` en las dos ocurrencias del path del ícono banknotes (ítems "Pagos" y "Mis Pagos", líneas 24 y 86) |
+
+El fix agrega el `sweep-flag = 0` faltante antes de las coordenadas del endpoint.
+
+#### Verificación
+
+- Errores desaparecidos en consola del navegador
+- Ícono renderiza idéntico visualmente (el sweep-flag `0` produce el mismo arco que el PDF espera)
+
+---
+
+### 2026-06-17 — Validación de entrada en PATCH `/api/personal/statements/[id]`
+
+#### Problema
+
+El endpoint `PATCH /api/personal/statements/[id]` aceptaba cualquier valor numérico para `assignedMonth` y `assignedYear` sin validar rangos. Un cliente malicioso (o un bug en el frontend) podía persistir `assignedMonth: 13`, `assignedMonth: 0` o `assignedYear: 1900` en la base de datos, corrompiendo la etiqueta de mes mostrada en la UI.
+
+#### Cambios aplicados
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/app/api/personal/statements/[id]/route.ts` | Validación de rangos antes del `prisma.bankStatement.update` |
+
+Reglas añadidas:
+
+| Campo | Validación | Error HTTP |
+|-------|-----------|------------|
+| `assignedMonth` | Entero en \[1, 12\]; null permitido (reset a auto) | 400 `"Mes inválido (debe ser 1–12)"` |
+| `assignedYear` | Entero en \[2000, 2100\]; null permitido | 400 `"Año inválido"` |
+| `assignedMonthSource` | Solo `"manual"` o `"auto"`; null permitido | 400 `"assignedMonthSource inválido"` |
+
+#### Verificación
+
+- Enviar `assignedMonth: 13` → 400 con mensaje descriptivo
+- Enviar `assignedMonth: null` → 200, resetea a cálculo automático desde `periodEnd`
+- Enviar `assignedMonthSource: "foo"` → 400 con mensaje descriptivo
+- Flujo normal desde la UI (guardar mes manual, restaurar automático) → sin cambios de comportamiento
+
+---
+
+### 2026-06-17 — Parser in-process Santander tarjeta de crédito + fix 504 nginx
+
+#### Problema
+
+Al importar un PDF de estado de cuenta de **tarjeta de crédito Santander** (Free, ORO, etc.) la petición fallaba con **504 Gateway Timeout** en `POST /api/personal/statements/import`. Tres causas raíz identificadas:
+
+1. **nginx `proxy_read_timeout` no configurado** — el valor por defecto de 60 s es insuficiente para el pipeline de IA que procesa PDFs no reconocidos.
+2. **Next.js route sin `maxDuration`** — en producción (Vercel o similares) la ruta abortaba antes de completarse.
+3. **PDF de tarjeta de crédito no reconocido** — `isSantanderCheckingPDF()` devolvía `false` para tarjetas de crédito (que no contienen `SALDO FINAL DEL PERIODO ANTERIOR`), por lo que el PDF caía al pipeline de OpenAI Vision que tardaba 60-120 s.
+
+#### Cambios aplicados
+
+| Área | Cambio |
+|------|--------|
+| nginx | Añadidos `proxy_read_timeout 300s; proxy_connect_timeout 60s; proxy_send_timeout 300s;` dentro de `location /` en `/etc/nginx/sites-enabled/finanzas.torrax.cloud`; recargado con `nginx -s reload` |
+| API route | `export const maxDuration = 300;` añadido en `src/app/api/personal/statements/import/route.ts` |
+| Nueva lib | `src/lib/financial/parsers/santander-credit-pdf.ts` — parser in-process para PDFs de tarjeta de crédito Santander; sin dependencias externas; ~200 ms vs 60-120 s del pipeline de IA |
+| Integración | Step 2b añadido en el pipeline de importación: `isSantanderCreditPDF()` → `parseSantanderCreditPDF()` entre el check de Cuenta Corriente (2a) y el fallback de IA (3) |
+
+#### Lógica del parser `santander-credit-pdf.ts`
+
+| Aspecto | Implementación |
+|---------|---------------|
+| Detección | `norm.includes("CARGOS, ABONOS Y COMPRAS REGULARES") && (norm.includes("NUMERO DE TARJETA") || norm.includes("TARJETA TITULAR"))` |
+| Sección | Extrae sólo "CARGOS, ABONOS Y COMPRAS REGULARES (NO A MESES)"; excluye diferidos a meses |
+| Período | Regex `Periodo: DD-Mon-YYYY al DD-Mon-YYYY`; falla con error descriptivo si no encuentra |
+| Tarjeta | `Número de tarjeta: XXXX XXXX XXXX YYYY` → guarda sólo últimos 4 dígitos |
+| Producto | `Denominación y categoría de la tarjeta: ORO` → `productName` |
+| Saldos | `Adeudo del periodo anterior` → `openingBalance`; `Pago para no generar intereses` → `closingBalance` |
+| Signo | `+` en PDF = cargo al cliente (`chargeAmount`); `-` en PDF = abono/pago (`creditAmount`) |
+| FX | Elimina `20.00 USD TC 17.5415` de la descripción antes de extraer referencia |
+| Referencia | Extrae `ISD 950921HE5`, `CPA 180810PH5`, `TPT 890516JP5`, `ANE 140618P37` como `reference` |
+| Deduplicación | `Set<string>` por `fecha|descripción|chargeAmount|creditAmount` dentro del lote |
+| Tipo | Retorna `account.type: "CREDIT"` |
+
+#### Archivos modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `/etc/nginx/sites-enabled/finanzas.torrax.cloud` | `proxy_read_timeout 300s`, `proxy_connect_timeout 60s`, `proxy_send_timeout 300s` |
+| `src/app/api/personal/statements/import/route.ts` | `export const maxDuration = 300;` + Step 2b (`isSantanderCreditPDF` / `parseSantanderCreditPDF`) |
+| `src/lib/financial/parsers/santander-credit-pdf.ts` | Archivo nuevo — parser completo de tarjeta de crédito Santander |
+
+#### Verificación
+
+| Prueba | Resultado |
+|--------|-----------|
+| `npx tsc --noEmit` | Sin errores TypeScript |
+| Importar `ESTADO DE CUENTA-FREE-FEBRERO2026.pdf` | Procesado en ~200 ms, sin llamadas a OpenAI; 8 transacciones importadas correctamente |
+| Referencias extraídas (`ISD`, `CPA`, `TPT`, `ANE`) | Correctas en todas las líneas de prueba |
+| Notación FX (`20.00 USD TC 17.5415`) | Eliminada de la descripción antes de guardar |
+| `pm2 restart finanzas-hogar --update-env` | Proceso online |
+
+---
+
+### 2026-06-17 — Mes asignado en estados de cuenta (`/personal/statements`)
+
+#### Problema
+
+El título de mes en los estados de cuenta se calculaba desde `periodStart` (fecha inicial del período), cuando debería calcularse desde `periodEnd` (fecha de corte). Ejemplo: el período `07/05/2026 — 05/06/2026` mostraba "mayo de 2026" en lugar de "junio de 2026". Además, no había manera de corregir el mes asignado si el cálculo automático era incorrecto.
+
+#### Cambios aplicados
+
+| Área | Cambio |
+|------|--------|
+| Schema Prisma | Tres campos nuevos en `BankStatement`: `assignedMonth Int?`, `assignedYear Int?`, `assignedMonthSource String? @default("auto")` |
+| DB | `prisma db push` aplicado — campos opcionales, sin pérdida de datos |
+| Cliente Prisma | `prisma generate` regenerado |
+| API nueva | `PATCH /api/personal/statements/[id]` — actualiza `assignedMonth`, `assignedYear`, `assignedMonthSource`; valida ownership por `userId`; bloquea `VIEWER` |
+| `periodLabel(s)` | Función refactorizada: recibe el objeto `BankStatement` completo en lugar de solo `periodStart`; si `assignedMonthSource === "manual"` usa `assignedMonth`/`assignedYear`; de lo contrario usa `periodEnd` |
+| `autoPeriodLabel(periodEnd)` | Nueva función auxiliar que siempre calcula desde `periodEnd`; usada como referencia en el botón "Usar mes automático" del modal |
+| KPI "Período" | Card rediseñada con ícono de lápiz junto al título del mes; badge "editado manualmente" cuando `assignedMonthSource === "manual"` |
+| Sidebar izquierdo | Ícono de lápiz por período visible en hover; abre el mismo modal de edición |
+| Modal edición | Selectores de mes (enero-diciembre) y año (±2 años desde hoy); vista previa en tiempo real del mes resultante; botón "Guardar" (persiste como manual); botón "Cancelar"; enlace "Usar mes automático (mes X)" que resetea a `assignedMonthSource: "auto"` |
+| Build | `npm run build` limpio — 45 rutas, 0 errores TypeScript |
+| Deploy | `pm2 restart finanzas-hogar` aplicado; proceso online |
+
+#### Regla de negocio
+
+| Fuente | Condición | Mes mostrado |
+|--------|-----------|--------------|
+| `auto` (default) | `assignedMonthSource` es `null` o `"auto"` | Mes y año de `periodEnd` |
+| `manual` | `assignedMonthSource === "manual"` y ambos campos definidos | `assignedMonth` / `assignedYear` guardados |
+
+#### Archivos modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `prisma/schema.prisma` | Campos `assignedMonth`, `assignedYear`, `assignedMonthSource` en `BankStatement` |
+| `src/app/api/personal/statements/[id]/route.ts` | Handler `PATCH` nuevo |
+| `src/app/(app)/personal/statements/page.tsx` | Interfaz, `periodLabel`, `autoPeriodLabel`, estados, handler `handleSavePeriod`, KPI card, sidebar, modal de edición |
+
+#### QA verificado 2026-06-17
+
+| Caso | Resultado esperado |
+|------|--------------------|
+| Estado con período `07/05 — 05/06` | Muestra "junio de 2026" (calculado desde `periodEnd`) |
+| Click en lápiz de KPI card | Abre modal con mes/año precargados del valor actual |
+| Cambiar mes a "marzo 2026" → Guardar | Título cambia a "marzo de 2026"; badge "editado manualmente" visible |
+| Click "Usar mes automático" | Título vuelve a "junio de 2026"; badge desaparece |
+| Click en lápiz del sidebar | Misma funcionalidad; estados de otros períodos no se afectan |
+| Build | `npm run build` limpio, sin errores TypeScript |
+
+---
 
 ### 2026-06-13 — Ordenamiento de movimientos en `/personal/statements`
 
@@ -1179,40 +1322,6 @@ El usuario podía ver sus movimientos bancarios en `/personal/statements` pero n
 | Filtro "No enviados" | Solo filas con badge "Pendiente" visibles |
 | Filtro "Ya enviados" | Solo filas con badge "En Mis Pagos" visibles |
 | Build | `npm run build` limpio, sin errores TypeScript |
-
----
-
-### 2026-06-08 — Recovery Plan cuadrado con estados de cuenta
-
-| Área | Cambio |
-|------|--------|
-| Backend | `src/lib/financial/recovery-plan.ts` ahora consulta `BankAccount.type = CREDIT` + `BankStatement` y genera items `sourceModel: "BankStatement"` para los saldos de tarjeta |
-| Cuadre de deuda | Para tarjetas usa `closingBalance` cuando existe; si el XML no trae saldo, reconstruye continuidad con `saldo previo + totalCharges - totalCredits`; si no hay saldo inicial conocido, marca calidad parcial (`BankStatement.closingBalance`) |
-| Flujo operativo | El promedio ingreso/egreso usa `BankTransaction` cuando hay estados importados y excluye pagos internos a tarjetas para no duplicar egresos ni convertir abonos de tarjeta en ingresos |
-| Prioridades | La matriz "Qué pagar primero" mezcla pagos manuales (`PersonalPayment`) y saldos de corte (`BankStatement`): vencidos primero, luego próximos 7/15 días, luego pendientes por monto |
-| Fechas límite | Mientras no exista vínculo con `PersonalCard.dueDay`, los vencimientos de tarjeta se estiman como `cutDate + 20 días`; el `reason` e insight lo declaran explícitamente |
-| UI | `/financial/recovery-plan` muestra badge "Saldo de corte" para filas de `BankStatement`; solo los `PersonalPayment` mantienen botón "Marcar pagado" |
-| Calidad de datos | Si un XML no incluye saldo final explícito, el aviso recomienda importar el PDF del estado de cuenta para máxima precisión |
-| Snapshot | `FinancialSnapshot.upsert` ahora se espera antes de responder para evitar carreras con el cierre del request/proceso |
-| Deploy | `npm run build` + `pm2 restart finanzas-hogar --update-env` aplicado; endpoint sin sesión responde 401 y página redirige a login |
-
-**Resultado verificado — Alexis, últimos 3 meses:**
-
-| Métrica | Valor |
-|---------|-------|
-| Ingreso mensual promedio | `$43,705.27` |
-| Egreso mensual promedio | `$36,312.32` |
-| Flujo libre | `$7,392.95` |
-| Capacidad de pago | `$6,892.95` |
-| Total vencido | `$36,396.96` |
-| Total pendiente | `$3,366.11` |
-| Deuda total tarjetas | `$39,763.07` |
-
-| Prioridad | Tarjeta | Saldo | Estado | Fecha límite estimada |
-|-----------|---------|-------|--------|------------------------|
-| 1 | Santander LikeU Oro 7784 | `$8,363.19` | `OVERDUE` | `2026-06-01` |
-| 2 | Santander AMEX 3037 | `$28,033.77` | `OVERDUE` | `2026-06-05` |
-| 3 | Santander Free 3937 | `$3,366.11` | `PENDING` | `2026-06-26` |
 
 ---
 
