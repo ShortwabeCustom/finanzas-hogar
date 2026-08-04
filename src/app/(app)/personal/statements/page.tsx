@@ -30,6 +30,9 @@ interface BankStatement {
   totalCredits: number | null;
   sourceFile: string | null;
   account: BankAccount;
+  assignedMonth: number | null;
+  assignedYear: number | null;
+  assignedMonthSource: string | null;
 }
 
 interface BankTransaction {
@@ -72,8 +75,17 @@ const EMPTY_DRAFT: TxnDraft = {
   balance: "",
 };
 
-function periodLabel(start: string): string {
-  const d = new Date(start.slice(0, 10) + "T12:00:00");
+function periodLabel(s: BankStatement): string {
+  if (s.assignedMonthSource === "manual" && s.assignedMonth != null && s.assignedYear != null) {
+    const d = new Date(s.assignedYear, s.assignedMonth - 1, 1);
+    return d.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+  }
+  const d = new Date(s.periodEnd.slice(0, 10) + "T12:00:00");
+  return d.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+}
+
+function autoPeriodLabel(periodEnd: string): string {
+  const d = new Date(periodEnd.slice(0, 10) + "T12:00:00");
   return d.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
 }
 
@@ -144,7 +156,7 @@ function MoveStatementModal({
           <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Origen</p>
             <p className="mt-1 text-sm font-semibold text-gray-900">{accountLabel(statement.account)}</p>
-            <p className="text-sm capitalize text-gray-500">{periodLabel(statement.periodStart)}</p>
+            <p className="text-sm capitalize text-gray-500">{periodLabel(statement)}</p>
           </div>
 
           <div className="space-y-1">
@@ -371,6 +383,12 @@ export default function StatementsPage() {
   const [sentFilter, setSentFilter] = useState<"" | "not_sent" | "sent">("");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  // Edit assigned month modal
+  const [editingPeriodStatement, setEditingPeriodStatement] = useState<BankStatement | null>(null);
+  const [periodEditMonth, setPeriodEditMonth] = useState("1");
+  const [periodEditYear, setPeriodEditYear] = useState(String(new Date().getFullYear()));
+  const [savingPeriod, setSavingPeriod] = useState(false);
 
   // Edit account modal
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
@@ -648,7 +666,7 @@ export default function StatementsPage() {
       }
 
       const deletedId = deletingStatement.id;
-      const deletedPeriod = periodLabel(deletingStatement.periodStart);
+      const deletedPeriod = periodLabel(deletingStatement);
       setDeletingStatement(null);
       setEditingTxnId(null);
       setIsAddingRow(false);
@@ -668,6 +686,42 @@ export default function StatementsPage() {
       toast.error(message);
     } finally {
       setDeletingStatementLoading(false);
+    }
+  }
+
+  // ── Edit assigned month ───────────────────────────────────
+  function openEditPeriod(s: BankStatement) {
+    const autoEnd = new Date(s.periodEnd.slice(0, 10) + "T12:00:00");
+    const month = s.assignedMonthSource === "manual" && s.assignedMonth != null
+      ? s.assignedMonth
+      : autoEnd.getMonth() + 1;
+    const year = s.assignedMonthSource === "manual" && s.assignedYear != null
+      ? s.assignedYear
+      : autoEnd.getFullYear();
+    setPeriodEditMonth(String(month));
+    setPeriodEditYear(String(year));
+    setEditingPeriodStatement(s);
+  }
+
+  async function handleSavePeriod(source: "manual" | "auto") {
+    if (!editingPeriodStatement) return;
+    setSavingPeriod(true);
+    try {
+      const body = source === "manual"
+        ? { assignedMonth: Number(periodEditMonth), assignedYear: Number(periodEditYear), assignedMonthSource: "manual" }
+        : { assignedMonth: null, assignedYear: null, assignedMonthSource: "auto" };
+      const res = await fetch(`/api/personal/statements/${editingPeriodStatement.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error();
+      setEditingPeriodStatement(null);
+      await loadStatements(editingPeriodStatement.id);
+    } catch {
+      // keep modal open
+    } finally {
+      setSavingPeriod(false);
     }
   }
 
@@ -962,9 +1016,23 @@ export default function StatementsPage() {
                             aria-pressed={isSelected}
                             className="min-w-0 flex-1 text-left px-3 py-2.5 cursor-pointer"
                           >
-                            <p className={`text-xs font-semibold capitalize ${isSelected ? "text-indigo-700" : "text-gray-700"}`}>
-                              {periodLabel(s.periodStart)}
-                            </p>
+                            <div className="flex items-center gap-1">
+                              <p className={`text-xs font-semibold capitalize ${isSelected ? "text-indigo-700" : "text-gray-700"}`}>
+                                {periodLabel(s)}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); openEditPeriod(s); }}
+                                aria-label="Editar mes asignado"
+                                title="Editar mes"
+                                className={`p-0.5 rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 ${isSelected ? "text-indigo-400 hover:text-indigo-700 hover:bg-indigo-100" : "text-gray-300 hover:text-gray-600 hover:bg-gray-100"}`}
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                            </div>
                             <div className="mt-1 flex justify-between gap-2 text-xs">
                               <span className="text-red-500">↑ {formatCurrency(Number(s.totalCharges ?? 0))}</span>
                               <span className="text-green-600">↓ {formatCurrency(Number(s.totalCredits ?? 0))}</span>
@@ -974,7 +1042,7 @@ export default function StatementsPage() {
                             type="button"
                             onClick={() => setDeletingStatement(s)}
                             disabled={deletingStatementLoading && deletingStatement?.id === s.id}
-                            aria-label={`Eliminar ${periodLabel(s.periodStart)} de ${accountLabel(s.account)}`}
+                            aria-label={`Eliminar ${periodLabel(s)} de ${accountLabel(s.account)}`}
                             title="Eliminar estado"
                             className={`mt-2 mr-2 rounded-lg p-1.5 transition-all disabled:opacity-40 ${
                               isSelected
@@ -994,7 +1062,7 @@ export default function StatementsPage() {
                               type="button"
                               onClick={() => openMoveStatement(s)}
                               disabled={accountOptions.length < 2}
-                              aria-label={`Mover ${periodLabel(s.periodStart)} de ${accountLabel(s.account)}`}
+                              aria-label={`Mover ${periodLabel(s)} de ${accountLabel(s.account)}`}
                               className="w-full rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 disabled:opacity-40 disabled:hover:bg-white transition-colors"
                             >
                               Mover
@@ -1015,8 +1083,30 @@ export default function StatementsPage() {
             {/* KPIs */}
             {selectedStatement && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* Período card — special: has edit button */}
+                <div className="rounded-xl p-4 bg-indigo-50 text-indigo-700">
+                  <p className="text-xs font-medium opacity-70">Período</p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <p className="text-lg font-bold leading-tight capitalize">{periodLabel(selectedStatement)}</p>
+                    <button
+                      type="button"
+                      onClick={() => openEditPeriod(selectedStatement)}
+                      aria-label="Editar mes asignado"
+                      title="Editar mes asignado"
+                      className="p-0.5 rounded text-indigo-400 hover:text-indigo-700 hover:bg-indigo-100 transition-colors flex-shrink-0"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                  </div>
+                  <p className="text-xs opacity-60 mt-0.5">{formatDate(selectedStatement.periodStart)} — {formatDate(selectedStatement.periodEnd)}</p>
+                  {selectedStatement.assignedMonthSource === "manual" && (
+                    <p className="text-[10px] opacity-50 mt-0.5 italic">editado manualmente</p>
+                  )}
+                </div>
                 {[
-                  { label: "Período", value: periodLabel(selectedStatement.periodStart), sub: `${formatDate(selectedStatement.periodStart)} — ${formatDate(selectedStatement.periodEnd)}`, color: "bg-indigo-50 text-indigo-700" },
                   { label: "Transacciones", value: transactions.length, sub: "en este período", color: "bg-gray-50 text-gray-700" },
                   { label: "Total cargos", value: formatCurrency(totalCharges), sub: "egresos del período", color: "bg-red-50 text-red-700" },
                   { label: "Total abonos", value: formatCurrency(totalCredits), sub: "ingresos del período", color: "bg-green-50 text-green-700" },
@@ -1551,7 +1641,7 @@ export default function StatementsPage() {
         title="Eliminar estado de cuenta"
         message={
           deletingStatement
-            ? `¿Eliminar ${periodLabel(deletingStatement.periodStart)} de ${accountLabel(deletingStatement.account)}? También se eliminarán sus movimientos bancarios importados.`
+            ? `¿Eliminar ${periodLabel(deletingStatement)} de ${accountLabel(deletingStatement.account)}? También se eliminarán sus movimientos bancarios importados.`
             : ""
         }
         confirmLabel="Eliminar estado"
@@ -1613,6 +1703,89 @@ export default function StatementsPage() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* ── Modal editar mes asignado ── */}
+      <Modal
+        open={!!editingPeriodStatement}
+        onClose={() => { if (!savingPeriod) setEditingPeriodStatement(null); }}
+        title="Mes asignado al estado"
+        size="sm"
+      >
+        {editingPeriodStatement && (
+          <div className="px-6 py-5 space-y-4">
+            <p className="text-xs text-gray-500">
+              El mes asignado se usa como título del estado de cuenta. Por defecto se calcula desde la fecha de corte (fecha final).
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label htmlFor="period-edit-month" className="text-sm font-medium text-gray-700">Mes</label>
+                <select
+                  id="period-edit-month"
+                  className="input w-full"
+                  value={periodEditMonth}
+                  onChange={(e) => setPeriodEditMonth(e.target.value)}
+                  disabled={savingPeriod}
+                >
+                  {[
+                    ["1","Enero"],["2","Febrero"],["3","Marzo"],["4","Abril"],
+                    ["5","Mayo"],["6","Junio"],["7","Julio"],["8","Agosto"],
+                    ["9","Septiembre"],["10","Octubre"],["11","Noviembre"],["12","Diciembre"],
+                  ].map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="period-edit-year" className="text-sm font-medium text-gray-700">Año</label>
+                <select
+                  id="period-edit-year"
+                  className="input w-full"
+                  value={periodEditYear}
+                  onChange={(e) => setPeriodEditYear(e.target.value)}
+                  disabled={savingPeriod}
+                >
+                  {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
+              Vista previa: <span className="font-semibold capitalize">
+                {new Date(Number(periodEditYear), Number(periodEditMonth) - 1, 1).toLocaleDateString("es-MX", { month: "long", year: "numeric" })}
+              </span>
+            </div>
+            <div className="pt-1 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => handleSavePeriod("auto")}
+                disabled={savingPeriod}
+                className="text-xs text-gray-400 hover:text-indigo-600 transition-colors disabled:opacity-40"
+              >
+                Usar mes automático ({autoPeriodLabel(editingPeriodStatement.periodEnd)})
+              </button>
+            </div>
+            <div className="flex justify-end gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setEditingPeriodStatement(null)}
+                className="btn-secondary"
+                disabled={savingPeriod}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSavePeriod("manual")}
+                className="btn-primary"
+                disabled={savingPeriod}
+              >
+                {savingPeriod
+                  ? <span className="flex items-center gap-2"><span className="animate-spin w-4 h-4 border-2 border-white/40 border-t-white rounded-full" />Guardando…</span>
+                  : "Guardar"}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* ── Modal editar procedencia ── */}

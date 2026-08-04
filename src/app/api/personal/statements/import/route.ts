@@ -4,10 +4,13 @@ import { authOptions } from "@/lib/auth";
 import { importStatement } from "@/lib/financial/import";
 import { isSantanderECB, parseSantanderECB } from "@/lib/financial/parsers/santander-ecb";
 import { isSantanderCheckingPDF, parseSantanderPDF } from "@/lib/financial/parsers/santander-pdf";
+import { isSantanderCreditPDF, parseSantanderCreditPDF } from "@/lib/financial/parsers/santander-credit-pdf";
 import { extractPdfText, parseWithAI } from "@/lib/financial/parsers/ai-fallback";
 import { parseStatementWithVision, VisionOcrError } from "@/lib/financial/parsers/vision-ocr";
 import { Prisma } from "@prisma/client";
 import type { ImportSummary, ImportStatementPayload } from "@/types/financial";
+
+export const maxDuration = 300;
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -178,7 +181,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(summary, { status: 200 });
     }
 
-    // Step 2: try Santander Cuenta Corriente in-process parser
+    // Step 2a: Santander Cuenta Corriente / Nómina in-process parser
     if (isSantanderCheckingPDF(pdfText)) {
       let payloads: ImportStatementPayload[];
       try {
@@ -189,6 +192,20 @@ export async function POST(req: NextRequest) {
       }
 
       const summary = await runImport(payloads, userId);
+      return NextResponse.json(summary, { status: 200 });
+    }
+
+    // Step 2b: Santander tarjeta de crédito (Free, ORO, Platinum, AMEX, etc.) in-process parser
+    if (isSantanderCreditPDF(pdfText)) {
+      let payload: ImportStatementPayload;
+      try {
+        payload = parseSantanderCreditPDF(pdfText, fileName);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Error al parsear el estado de cuenta de tarjeta Santander";
+        return NextResponse.json({ error: msg }, { status: 422 });
+      }
+
+      const summary = await runImport([payload], userId);
       return NextResponse.json(summary, { status: 200 });
     }
 
