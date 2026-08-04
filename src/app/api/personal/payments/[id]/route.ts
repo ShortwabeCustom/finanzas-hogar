@@ -115,6 +115,21 @@ export async function DELETE(
     const payment = await getOwnedPayment(id, session.user.id);
     if (!payment) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
+    // Check if payment is linked to a debt
+    const debtPayment = await prisma.debtPayment.findUnique({
+      where: { personalPaymentId: id },
+    });
+
+    if (debtPayment) {
+      return NextResponse.json(
+        {
+          error:
+            "Este pago está vinculado a una deuda. Elimínalo desde el historial de la deuda para recalcular el saldo correctamente.",
+        },
+        { status: 409 }
+      );
+    }
+
     await prisma.personalPayment.delete({ where: { id } });
 
     return NextResponse.json({ success: true });

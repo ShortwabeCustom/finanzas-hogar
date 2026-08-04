@@ -63,15 +63,16 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts            Account[]
-  sessions            Session[]
-  payments            Payment[]
-  pantryItems         PantryItem[]
-  personalCategories  PersonalCategory[]
-  personalPayments    PersonalPayment[]
-  personalCards       PersonalCard[]
-  bankAccounts        BankAccount[]
-  financialSnapshots  FinancialSnapshot[]
+  accounts           Account[]
+  sessions           Session[]
+  payments           Payment[]
+  pantryItems        PantryItem[]
+  personalCategories PersonalCategory[]
+  personalPayments   PersonalPayment[]
+  personalCards      PersonalCard[]
+  bankAccounts       BankAccount[]
+  financialSnapshots FinancialSnapshot[]
+  debtAccounts       DebtAccount[]
 }
 
 // ─── CATEGORIES ────────────────────────────────────────────────────────────────
@@ -146,14 +147,14 @@ model Payment {
   category   Category @relation(fields: [categoryId], references: [id])
 
   paidById String?
-  paidBy   User?    @relation(fields: [paidById], references: [id])
+  paidBy   User?   @relation(fields: [paidById], references: [id])
 
   personalCardId String?
   card           PersonalCard? @relation("SharedPaymentCard", fields: [personalCardId], references: [id], onDelete: SetNull)
 
-  bankTransactionId String?         @unique
+  bankTransactionId String? @unique
   sourceStatementId String?
-  importedFromBank  Boolean         @default(false)
+  importedFromBank  Boolean @default(false)
 
   bankTransaction BankTransaction? @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
 
@@ -183,10 +184,10 @@ model PantryItem {
   name         String
   quantity     Decimal    @db.Decimal(10, 3)
   unit         PantryUnit @default(PCS)
-  minStock     Decimal    @db.Decimal(10, 3) @default(1)
+  minStock     Decimal    @default(1) @db.Decimal(10, 3)
   price        Decimal?   @db.Decimal(10, 2)
-  purchaseDate DateTime? @db.Date
-  expiryDate   DateTime? @db.Date
+  purchaseDate DateTime?  @db.Date
+  expiryDate   DateTime?  @db.Date
   comments     String?    @db.Text
   active       Boolean    @default(true)
   createdAt    DateTime   @default(now())
@@ -196,7 +197,7 @@ model PantryItem {
   category   Category @relation(fields: [categoryId], references: [id])
 
   addedById String?
-  addedBy   User?    @relation(fields: [addedById], references: [id])
+  addedBy   User?   @relation(fields: [addedById], references: [id])
 
   purchaseHistory PantryPurchaseHistory[]
 }
@@ -245,21 +246,21 @@ model PersonalCategory {
 }
 
 model PersonalPayment {
-  id             String        @id @default(cuid())
-  userId         String
-  folio          String        @unique
-  name           String
-  concept        String
-  amount         Decimal       @db.Decimal(12, 2)
-  categoryId     String
-  personalCardId String?
-  period         Period        @default(MONTHLY)
-  status         PaymentStatus @default(PENDING)
-  paymentMethod  PaymentMethod @default(CASH)
-  dueDate        DateTime?
-  paymentDate    DateTime?
-  notes          String?        @db.Text
-  receipt        String?
+  id                String          @id @default(cuid())
+  userId            String
+  folio             String          @unique
+  name              String
+  concept           String
+  amount            Decimal         @db.Decimal(12, 2)
+  categoryId        String
+  personalCardId    String?
+  period            Period          @default(MONTHLY)
+  status            PaymentStatus   @default(PENDING)
+  paymentMethod     PaymentMethod   @default(CASH)
+  dueDate           DateTime?
+  paymentDate       DateTime?
+  notes             String?         @db.Text
+  receipt           String?
   type              String?
   financialClass    FinancialClass?
   bankTransactionId String?         @unique
@@ -268,10 +269,11 @@ model PersonalPayment {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category        PersonalCategory  @relation(fields: [categoryId], references: [id])
-  card            PersonalCard?     @relation(fields: [personalCardId], references: [id])
-  bankTransaction BankTransaction?  @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category        PersonalCategory @relation(fields: [categoryId], references: [id])
+  card            PersonalCard?    @relation(fields: [personalCardId], references: [id])
+  bankTransaction BankTransaction? @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
+  debtPayment     DebtPayment?
 
   @@index([userId])
   @@index([userId, status])
@@ -303,6 +305,7 @@ model PersonalCard {
   user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments       PersonalPayment[]
   sharedPayments Payment[]         @relation("SharedPaymentCard")
+  debtAccounts   DebtAccount[]
 
   @@unique([userId, bankName, last4Digits, paymentSourceType])
   @@index([userId])
@@ -365,17 +368,20 @@ model BankAccount {
 }
 
 model BankStatement {
-  id             String    @id @default(cuid())
-  accountId      String
-  periodStart    DateTime  @db.Date
-  periodEnd      DateTime  @db.Date
-  cutDate        DateTime? @db.Date
-  openingBalance Decimal?  @db.Decimal(14, 2)
-  closingBalance Decimal?  @db.Decimal(14, 2)
-  totalCharges   Decimal?  @db.Decimal(14, 2)
-  totalCredits   Decimal?  @db.Decimal(14, 2)
-  sourceFile     String?
-  importedAt     DateTime  @default(now())
+  id                  String    @id @default(cuid())
+  accountId           String
+  periodStart         DateTime  @db.Date
+  periodEnd           DateTime  @db.Date
+  cutDate             DateTime? @db.Date
+  openingBalance      Decimal?  @db.Decimal(14, 2)
+  closingBalance      Decimal?  @db.Decimal(14, 2)
+  totalCharges        Decimal?  @db.Decimal(14, 2)
+  totalCredits        Decimal?  @db.Decimal(14, 2)
+  sourceFile          String?
+  importedAt          DateTime  @default(now())
+  assignedMonth       Int?
+  assignedYear        Int?
+  assignedMonthSource String?   @default("auto")
 
   account      BankAccount       @relation(fields: [accountId], references: [id], onDelete: Cascade)
   transactions BankTransaction[]
@@ -408,4 +414,123 @@ model BankTransaction {
   @@index([accountId])
   @@index([statementId])
   @@index([transactionDate])
+}
+
+// ─── PERSONAL DEBTS AND LOANS ──────────────────────────────────────────────────
+
+enum DebtDirection {
+  PAYABLE
+  RECEIVABLE
+}
+
+enum DebtType {
+  PERSONAL_LOAN
+  CREDIT_CARD
+  AUTO_LOAN
+  MORTGAGE
+  BNPL
+  FAMILY_LOAN
+  LOAN_GRANTED
+  OTHER
+}
+
+enum DebtStatus {
+  ACTIVE
+  PAID_OFF
+  PAUSED
+  CANCELLED
+  DEFAULTED
+}
+
+enum DebtScheduleMode {
+  FREE
+  INSTALLMENTS
+}
+
+enum DebtInstallmentStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model DebtAccount {
+  id                   String           @id @default(cuid())
+  userId               String
+  direction            DebtDirection
+  type                 DebtType
+  name                 String
+  counterpartyName     String?
+  originalPrincipal    Decimal          @db.Decimal(14, 2)
+  currentPrincipal     Decimal          @db.Decimal(14, 2)
+  annualInterestRate   Decimal?         @db.Decimal(8, 4)
+  scheduleMode         DebtScheduleMode
+  paymentFrequency     Period?
+  scheduledPayment     Decimal?         @db.Decimal(14, 2)
+  numberOfInstallments Int?
+  startDate            DateTime         @db.Date
+  estimatedEndDate     DateTime?        @db.Date
+  nextDueDate          DateTime?        @db.Date
+  personalCardId       String?
+  status               DebtStatus       @default(ACTIVE)
+  notes                String?          @db.Text
+  agreementUrl         String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  personalCard PersonalCard?     @relation(fields: [personalCardId], references: [id], onDelete: SetNull)
+  installments DebtInstallment[]
+  payments     DebtPayment[]
+
+  @@index([userId, status])
+  @@index([userId, direction])
+  @@index([userId, nextDueDate])
+}
+
+model DebtInstallment {
+  id                String                @id @default(cuid())
+  debtId            String
+  sequence          Int
+  dueDate           DateTime              @db.Date
+  expectedAmount    Decimal               @db.Decimal(14, 2)
+  expectedPrincipal Decimal?              @db.Decimal(14, 2)
+  expectedInterest  Decimal?              @db.Decimal(14, 2)
+  expectedFees      Decimal?              @db.Decimal(14, 2)
+  totalPaid         Decimal               @default(0) @db.Decimal(14, 2)
+  status            DebtInstallmentStatus @default(PENDING)
+  isEstimated       Boolean               @default(false)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  debt     DebtAccount   @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  payments DebtPayment[]
+
+  @@unique([debtId, sequence])
+  @@index([debtId, dueDate])
+  @@index([debtId, status])
+}
+
+model DebtPayment {
+  id                String   @id @default(cuid())
+  debtId            String
+  installmentId     String?
+  personalPaymentId String   @unique
+  paidAt            DateTime
+  principalAmount   Decimal  @db.Decimal(14, 2)
+  interestAmount    Decimal  @default(0) @db.Decimal(14, 2)
+  feeAmount         Decimal  @default(0) @db.Decimal(14, 2)
+  penaltyAmount     Decimal  @default(0) @db.Decimal(14, 2)
+  totalAmount       Decimal  @db.Decimal(14, 2)
+  notes             String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  debt            DebtAccount      @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  installment     DebtInstallment? @relation(fields: [installmentId], references: [id], onDelete: SetNull)
+  personalPayment PersonalPayment  @relation(fields: [personalPaymentId], references: [id], onDelete: Cascade)
+
+  @@index([debtId, paidAt])
+  @@index([personalPaymentId])
 }
