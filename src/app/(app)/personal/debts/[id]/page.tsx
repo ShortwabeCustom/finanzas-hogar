@@ -262,12 +262,12 @@ export default function DebtDetailPage() {
         <div className="card p-6 space-y-3">
           <div>
             <p className="text-sm text-gray-500">Capital Pagado</p>
-            <p className="text-2xl font-bold text-emerald-600">{formatCurrency(totals.principalPaid.toString())}</p>
+            <p className="text-2xl font-bold text-emerald-600">{formatCurrency(totals.principalPaid.toNumber())}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Intereses + Comisiones</p>
             <p className="text-2xl font-bold text-gray-900">
-              {formatCurrency((Number(totals.interestPaid) + Number(totals.feesPaid)).toString())}
+              {formatCurrency(totals.interestPaid.toNumber() + totals.feesPaid.toNumber())}
             </p>
           </div>
         </div>
