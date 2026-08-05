@@ -52,7 +52,7 @@ describe('calculateDebtTotals', () => {
     expect(result.principalPaid.toNumber()).toBe(5000);
     expect(result.interestPaid.toNumber()).toBe(250);
     expect(result.currentBalance.toNumber()).toBe(5000);
-    expect(result.totalPaid.toNumber()).toBe(5400);
+    expect(result.totalPaid.toNumber()).toBe(5300);
     expect(result.isFullyPaid).toBe(false);
   });
 

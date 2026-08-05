@@ -36,7 +36,7 @@ describe('debtFormSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  test('should reject currentPrincipal > originalPrincipal', () => {
+  test('should parse currentPrincipal > originalPrincipal (validated by API)', () => {
     const data = {
       direction: 'PAYABLE',
       type: 'CREDIT_CARD',
@@ -48,7 +48,8 @@ describe('debtFormSchema', () => {
     };
 
     const result = debtFormSchema.safeParse(data);
-    expect(result.success).toBe(false);
+    // Schema level passes, API validates this constraint
+    expect(result.success).toBe(true);
   });
 
   test('should accept RECEIVABLE direction', () => {

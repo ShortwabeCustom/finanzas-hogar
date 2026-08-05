@@ -73,6 +73,7 @@ model User {
   bankAccounts       BankAccount[]
   financialSnapshots FinancialSnapshot[]
   debtAccounts       DebtAccount[]
+  debtNotifications  DebtNotification[]
 }
 
 // ─── CATEGORIES ────────────────────────────────────────────────────────────────
@@ -462,6 +463,19 @@ enum DebtInstallmentStatus {
   CANCELLED
 }
 
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum NotificationType {
+  EMAIL
+  WHATSAPP
+  PUSH
+}
+
 model DebtAccount {
   id                   String           @id @default(cuid())
   userId               String
@@ -490,6 +504,7 @@ model DebtAccount {
   personalCard      PersonalCard?     @relation(fields: [personalCardId], references: [id], onDelete: SetNull)
   installments      DebtInstallment[]
   payments          DebtPayment[]
+  notifications     DebtNotification[]
   linkedPayments    PersonalPayment[] // Abonos vinculados
   linkedTransactions BankTransaction[] // Transacciones vinculadas
 
@@ -542,4 +557,34 @@ model DebtPayment {
 
   @@index([debtId, paidAt])
   @@index([personalPaymentId])
+}
+
+model DebtNotification {
+  id                String              @id @default(cuid())
+  userId            String
+  debtId            String
+  type              NotificationType
+  status            NotificationStatus  @default(PENDING)
+  subject           String?             // Para EMAIL
+  message           String
+  recipientEmail    String?
+  recipientPhone    String?
+  dueDate           DateTime
+  daysBefore        Int                 // Enviar N días antes (default 3)
+  sentAt            DateTime?
+  failureReason     String?
+  retryCount        Int                 @default(0)
+  maxRetries        Int                 @default(3)
+  lastRetryAt       DateTime?
+  nextRetryAt       DateTime?
+  externalId        String?             // ID de proveedor (SendGrid, Twilio)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  user User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  debt DebtAccount    @relation(fields: [debtId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([dueDate])
+  @@index([userId, debtId])
 }

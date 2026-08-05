@@ -13,6 +13,7 @@ export type DebtEventType =
   | 'debt_marked_paid_off'
   | 'debt_installment_generated'
   | 'debt_transaction_linked'
+  | 'debt_notification_sent'
   | 'debt_filter_used';
 
 export type AmountBucket = '0-1000' | '1000-5000' | '5000-20000' | '20000-100000' | '100000+';
