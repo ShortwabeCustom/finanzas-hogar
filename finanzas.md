@@ -1895,3 +1895,68 @@ de50523 test(debts): add comprehensive unit tests with 80%+ coverage
 - GitHub Actions corre con 1 worker en CI para estabilidad y evitar timeouts
 - Playwright config reutiliza dev server existente (`npm run dev`), no spin-up adicional
 - Coverage threshold 80% es estándar industria; puede subirse a 85-90% en refinamientos futuros
+
+---
+
+### 2026-08-05 — Bugfix: Validation y Type Casting en Deudas
+
+#### Problemas identificados y arreglados
+
+Después del INCREMENTO 4 Sesión 1, se detectaron 4 errores de validación y type casting en el módulo de deudas:
+
+| # | Error | Síntoma | Causa raíz | Solución |
+|---|-------|---------|-----------|----------|
+| 1 | `paymentFrequency` validation falla | Formulario rechaza "Deuda con cuotas" con `invalid_value` error | El formulario enviaba `paymentFrequency: ""` (string vacía) en lugar de `null` | Convertir string vacía a `null` antes de validación en `DebtFormSheet.tsx` |
+| 2 | "Próximo vencimiento" muestra "$NaN" en listado | KPI cards muestran "$NaN" en lugar de montos | Mismatch entre nombres de propiedades del endpoint y el componente | Renombrar en endpoint: `payableBalance` → `totalPayable`, `receivableBalance` → `totalReceivable`, `estimatedMonthlyCommitment` → `estimatedMonthlyPayment`, `nextDue` → `nextDueDate` |
+| 3 | Página detalle deuda falla con "toFixed is not a function" | Pantalla en blanco con error en console | `Prisma.Decimal.toString()` retorna string que no puede usarse con `.toFixed()` en `formatCurrency()` | Usar `.toNumber()` en lugar de `.toString()` para convertir Decimal a número |
+| 4 | Sheet de pago rechaza deuda | "Máximo: $undefined" y error al abrir sheet | `currentBalance` prop puede ser `Decimal` de Prisma, no `number` | Safe conversion: detectar tipo y convertir con `.toNumber()` si es Decimal, `parseFloat()` si string, `Number()` para otros |
+
+#### Cambios aplicados
+
+| Archivo | Línea(s) | Cambio |
+|---------|----------|--------|
+| `src/components/personal/debts/DebtFormSheet.tsx` | 127 | Añadir `paymentFrequency: formData.paymentFrequency \|\| null` para convertir string vacía a null |
+| `src/app/api/personal/debts/summary/route.ts` | 77-84 | Renombrar propiedades de respuesta JSON para coincidir con interfaz `DebtSummary` |
+| `src/app/(app)/personal/debts/[id]/page.tsx` | 265, 270 | Cambiar `totals.principalPaid.toString()` → `.toNumber()` y suma de `.toNumber()` |
+| `src/components/personal/debts/DebtPaymentSheet.tsx` | 10-17, 38-46, 231 | Safe conversion de `currentBalance` a `balanceAsNumber` con soporte para Decimal, string, number |
+
+#### Validación
+
+| Comando | Resultado |
+|---------|-----------|
+| `npm run build` | ✅ Exitoso, 46 rutas, 0 errores TypeScript |
+| Crear deuda con cuotas | ✅ Formulario acepta frecuencia vacía como null |
+| Ver listado deudas | ✅ KPI cards muestran montos correctos (no NaN) |
+| Abrir detalle deuda | ✅ Página carga sin errores |
+| Abrir sheet pago | ✅ Campo máximo muestra balance correctamente |
+
+#### Commits
+
+```
+a201e80 fix(debts): handle empty paymentFrequency as null in form submission
+04e81cc fix(debts): use toNumber() instead of toString() for Decimal formatting
+1df4590 fix(debts): safely convert currentBalance to number in DebtPaymentSheet
+0444553 fix(debts): correct summary endpoint field names to match component interface
+```
+
+#### Raíz del patrón de errores
+
+Todos estos errores comparten una causa común: **mismatch entre tipos Prisma.Decimal en el backend y números en el frontend**, más **inconsistencia entre nombres de propiedades en API vs componentes UI**.
+
+**Lecciones aprendidas:**
+- Siempre convertir `Prisma.Decimal` a número con `.toNumber()` antes de enviar al frontend, NO `.toString()`
+- Los nombres de propiedades en respuestas API deben coincidir exactamente con las interfaces TypeScript del cliente
+- Type-safe form field conversions: permitir `null | undefined` para campos opcionales, nunca strings vacías
+- Prop interfaces deben documentar si el valor puede venir como `Decimal | number | string` para permitir safe conversions en componentes
+
+#### QA verificado 2026-08-05
+
+| Caso de uso | Status |
+|-------------|--------|
+| Crear deuda sin especificar frecuencia | ✅ Acepta null, guarda en BD |
+| Crear deuda con cuotas mensuales | ✅ Frecuencia "Mensual" se guarda correctamente |
+| Ver deuda en listado | ✅ KPIs muestran montos (saldo, ingresos estimados, etc.) |
+| Abrir detalles de deuda | ✅ Página carga con historial de pagos y cuotas |
+| Registrar abono en deuda | ✅ Sheet abre, campo máximo muestra balance actual |
+| Guardar abono | ✅ Desglose (capital + interés + comisiones + penalizaciones) valida correctamente |
+| PM2 logs | ✅ Sin errores de runtime post-deploy |
