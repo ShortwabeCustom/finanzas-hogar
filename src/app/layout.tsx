@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 import SessionProvider from "@/components/providers/SessionProvider";
 import ToastProvider from "@/components/providers/ToastProvider";
 
-const inter = Inter({ subsets: ["latin"] });
+const ibmPlexSans = IBM_Plex_Sans({
+  weight: ["300", "400", "500", "600", "700"],
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Finanzas del Hogar",
@@ -19,7 +23,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={ibmPlexSans.className}>
         <SessionProvider>{children}</SessionProvider>
         <ToastProvider />
       </body>
