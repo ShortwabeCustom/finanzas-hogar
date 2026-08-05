@@ -125,10 +125,18 @@ export default function DashboardPage() {
       const res = await fetch(
         `/api/dashboard?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}&granularity=${granularity}`
       );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        if (res.status === 401) {
+          setError("Tu sesión ha expirado. Por favor recarga la página para iniciar sesión nuevamente.");
+        } else {
+          setError(`Error al cargar dashboard (${res.status}). Verifica tu conexión e intenta de nuevo.`);
+        }
+        return;
+      }
       const d = await res.json();
       setData(d);
-    } catch {
+    } catch (err) {
+      console.error("[dashboard] fetch error:", err);
       setError("No se pudo cargar el dashboard. Verifica tu conexión e intenta de nuevo.");
     } finally {
       setLoading(false);

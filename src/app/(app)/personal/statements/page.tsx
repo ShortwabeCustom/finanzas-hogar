@@ -6,6 +6,7 @@ import ApiErrorState from "@/components/ui/ApiErrorState";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import Modal from "@/components/ui/Modal";
 import StatementImportCard from "@/components/statements/StatementImportCard";
+import LinkTransactionModal from "@/components/personal/debts/LinkTransactionModal";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import toast from "react-hot-toast";
 
@@ -398,6 +399,11 @@ export default function StatementsPage() {
   const [savingAccount, setSavingAccount] = useState(false);
   const [saveAccountError, setSaveAccountError] = useState<string | null>(null);
 
+  // Link transaction to debt
+  const [debts, setDebts] = useState<any[]>([]);
+  const [linkingTransaction, setLinkingTransaction] = useState<BankTransaction | null>(null);
+  const [unlinkedOnlyFilter, setUnlinkedOnlyFilter] = useState(false);
+
   const loadStatements = useCallback(async (preferredStatementId?: string | null) => {
     setLoadingStatements(true);
     setStatementsError(null);
@@ -425,7 +431,22 @@ export default function StatementsPage() {
     }
   }, []);
 
-  useEffect(() => { loadStatements(); }, [loadStatements]);
+  const loadDebts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/personal/debts");
+      if (res.ok) {
+        const data = await res.json();
+        setDebts(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error("Error loading debts:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStatements();
+    loadDebts();
+  }, [loadStatements, loadDebts]);
 
   const fetchTransactions = useCallback(async () => {
     if (!selectedStatement) {
@@ -478,12 +499,17 @@ export default function StatementsPage() {
   const totalCharges = transactions.reduce((s, t) => s + Number(t.chargeAmount ?? 0), 0);
   const totalCredits = transactions.reduce((s, t) => s + Number(t.creditAmount ?? 0), 0);
 
-  // Transacciones filtradas por estado de envío (cliente)
+  // Transacciones filtradas por estado de envío (cliente) y deudas
   const visibleTransactions = useMemo(() => {
-    if (sentFilter === "sent") return transactions.filter((t) => !!t.personalPayment);
-    if (sentFilter === "not_sent") return transactions.filter((t) => !t.personalPayment);
-    return transactions;
-  }, [transactions, sentFilter]);
+    let result = transactions;
+
+    if (sentFilter === "sent") result = result.filter((t) => !!t.personalPayment);
+    if (sentFilter === "not_sent") result = result.filter((t) => !t.personalPayment);
+
+    if (unlinkedOnlyFilter) result = result.filter((t) => !t.personalPayment);
+
+    return result;
+  }, [transactions, sentFilter, unlinkedOnlyFilter]);
 
   // Solo las visibles y seleccionables (sin pago vinculado)
   const selectableTransactions = useMemo(
@@ -1168,7 +1194,7 @@ export default function StatementsPage() {
             )}
 
             {/* Filtros */}
-            <div className="card p-4">
+            <div className="card p-4 space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <input
                   className="input"
@@ -1205,6 +1231,15 @@ export default function StatementsPage() {
                   <span>{selectedStatement ? accountLabel(selectedStatement.account) : "—"}</span>
                 </div>
               </div>
+              <label className="flex items-center gap-2 text-sm text-gray-700 border-t border-gray-200 pt-3">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  checked={unlinkedOnlyFilter}
+                  onChange={(e) => setUnlinkedOnlyFilter(e.target.checked)}
+                />
+                <span>Mostrar solo transacciones no vinculadas a deudas</span>
+              </label>
             </div>
 
             {/* Tabla */}
@@ -1349,16 +1384,31 @@ export default function StatementsPage() {
                                   <p className="text-xs text-gray-400 mt-0.5">Saldo {formatCurrency(t.balance)}</p>
                                 )}
                               </div>
-                              <button
-                                onClick={() => openMobileEdit(t)}
-                                aria-label={`Editar movimiento ${t.description}`}
-                                className="p-1.5 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors cursor-pointer"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                              </button>
+                              <div className="flex gap-1">
+                                {!t.personalPayment && (
+                                  <button
+                                    onClick={() => setLinkingTransaction(t)}
+                                    aria-label={`Vincular movimiento ${t.description} a deuda`}
+                                    className="p-1.5 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors cursor-pointer"
+                                    title="Vincular a deuda"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                        d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.658 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                    </svg>
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => openMobileEdit(t)}
+                                  aria-label={`Editar movimiento ${t.description}`}
+                                  className="p-1.5 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors cursor-pointer"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1570,16 +1620,31 @@ export default function StatementsPage() {
                                 {t.balance != null ? formatCurrency(t.balance) : <span className="text-gray-300">—</span>}
                               </td>
                               <td className="px-4 py-3">
-                                <button
-                                  onClick={() => startEdit(t)}
-                                  aria-label={`Editar ${t.description}`}
-                                  className="p-1 rounded text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </button>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                  {!t.personalPayment && (
+                                    <button
+                                      onClick={() => setLinkingTransaction(t)}
+                                      aria-label={`Vincular ${t.description} a deuda`}
+                                      className="p-1 rounded text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 cursor-pointer transition-colors"
+                                      title="Vincular a deuda"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                          d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.658 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => startEdit(t)}
+                                    aria-label={`Editar ${t.description}`}
+                                    className="p-1 rounded text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 cursor-pointer transition-colors"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           )
@@ -1838,6 +1903,18 @@ export default function StatementsPage() {
           </div>
         </div>
       </Modal>
+
+      {/* ── Link transaction to debt modal ── */}
+      <LinkTransactionModal
+        open={!!linkingTransaction}
+        onClose={() => setLinkingTransaction(null)}
+        onSuccess={() => {
+          setLinkingTransaction(null);
+          fetchTransactions();
+        }}
+        transaction={linkingTransaction}
+        debtAccounts={debts}
+      />
     </div>
   );
 }
