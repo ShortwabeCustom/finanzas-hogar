@@ -12,7 +12,7 @@ interface DebtPaymentSheetProps {
   onClose: () => void;
   onSuccess: () => void;
   debtId: string;
-  currentBalance: number;
+  currentBalance: number | string | any;
 }
 
 interface PersonalCard {
@@ -35,6 +35,13 @@ export default function DebtPaymentSheet({
   debtId,
   currentBalance,
 }: DebtPaymentSheetProps) {
+  // Convert Decimal or string to number
+  const balanceAsNumber = typeof currentBalance === 'number'
+    ? currentBalance
+    : typeof currentBalance === 'string'
+      ? parseFloat(currentBalance)
+      : Number(currentBalance?.toNumber?.() || currentBalance);
+
   const [loading, setLoading] = useState(false);
   const [cards, setCards] = useState<PersonalCard[]>([]);
   const [installments, setInstallments] = useState<DebtInstallment[]>([]);
@@ -221,14 +228,14 @@ export default function DebtPaymentSheet({
               placeholder="0.00"
               step="0.01"
               min="0"
-              max={currentBalance}
+              max={balanceAsNumber}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               aria-describedby={errors.principalAmount ? "principal-error" : undefined}
             />
             {errors.principalAmount && (
               <p id="principal-error" className="text-xs text-red-600 mt-1">{errors.principalAmount}</p>
             )}
-            <p className="text-xs text-gray-500 mt-1">Máximo: ${currentBalance.toFixed(2)}</p>
+            <p className="text-xs text-gray-500 mt-1">Máximo: ${balanceAsNumber.toFixed(2)}</p>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
