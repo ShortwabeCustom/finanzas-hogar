@@ -3,11 +3,11 @@
 import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import {
-  BellIcon,
-  CheckCircleIcon,
-  ExclamationCircleIcon,
-  EnvelopeIcon,
-  PhoneIcon,
+  Bell,
+  CheckCircle,
+  AlertCircle,
+  Mail,
+  Phone,
 } from "lucide-react";
 
 interface DebtAccount {
@@ -108,7 +108,7 @@ export default function NotificationsSettings() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="w-8 h-8 mx-auto mb-3 text-slate-400 animate-spin">
-            <BellIcon />
+            <Bell />
           </div>
           <p className="text-slate-600 dark:text-slate-400">Cargando configuración...</p>
         </div>
@@ -122,7 +122,7 @@ export default function NotificationsSettings() {
       <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
         <div className="max-w-3xl mx-auto px-4 md:px-6 lg:px-8 py-8">
           <div className="flex items-center gap-3 mb-2">
-            <BellIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+            <Bell className="w-8 h-8 text-blue-600 dark:text-blue-400" />
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
               Configuración de Notificaciones
             </h1>
@@ -139,7 +139,7 @@ export default function NotificationsSettings() {
         <section className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-700">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <EnvelopeIcon className="w-5 h-5 text-slate-400" />
+              <Mail className="w-5 h-5 text-slate-400" />
               Datos de Contacto
             </h2>
           </div>
@@ -166,7 +166,7 @@ export default function NotificationsSettings() {
             {/* Teléfono WhatsApp (Editable) */}
             <div>
               <label htmlFor="phone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
-                <PhoneIcon className="w-4 h-4" />
+                <Phone className="w-4 h-4" />
                 Teléfono WhatsApp (Opcional)
               </label>
 
@@ -227,7 +227,7 @@ export default function NotificationsSettings() {
 
           {debts.length === 0 ? (
             <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-8 text-center">
-              <BellIcon className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+              <Bell className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
               <p className="text-slate-600 dark:text-slate-400">
                 No hay deudas a pagar registradas
               </p>
@@ -441,7 +441,7 @@ function NotificationHistory({ history }: NotificationHistoryProps) {
   if (!history?.length) {
     return (
       <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-8 text-center">
-        <BellIcon className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+        <Bell className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
         <p className="text-slate-600 dark:text-slate-400">
           No hay notificaciones aún
         </p>
@@ -501,10 +501,10 @@ function NotificationHistory({ history }: NotificationHistoryProps) {
                     }`}
                   >
                     {n.status === "SENT" && (
-                      <CheckCircleIcon className="w-4 h-4" />
+                      <CheckCircle className="w-4 h-4" />
                     )}
                     {n.status === "FAILED" && (
-                      <ExclamationCircleIcon className="w-4 h-4" />
+                      <AlertCircle className="w-4 h-4" />
                     )}
                     {n.status}
                   </span>
