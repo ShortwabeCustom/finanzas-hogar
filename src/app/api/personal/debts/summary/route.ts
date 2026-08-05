@@ -75,10 +75,10 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      payableBalance: payableBalance.toNumber(),
-      receivableBalance: receivableBalance.toNumber(),
-      estimatedMonthlyCommitment: estimatedMonthlyCommitment.toNumber(),
-      nextDue,
+      totalPayable: payableBalance.toNumber(),
+      totalReceivable: receivableBalance.toNumber(),
+      estimatedMonthlyPayment: estimatedMonthlyCommitment.toNumber(),
+      nextDueDate: nextDue,
       overdueInstallments,
       principalPaidCurrentYear: principalPaidCurrentYear.toNumber(),
     });
