@@ -58,6 +58,7 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
+  phone         String?
   role          UserRole  @default(VIEWER)
   active        Boolean   @default(true)
   createdAt     DateTime  @default(now())
