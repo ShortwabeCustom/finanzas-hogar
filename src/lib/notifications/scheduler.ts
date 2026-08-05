@@ -24,8 +24,9 @@ export async function processPendingNotifications(): Promise<{ processed: number
   for (const notification of pending) {
     try {
       let result;
+      const notificationType = notification.type as 'EMAIL' | 'WHATSAPP';
       const payload = {
-        type: notification.type,
+        type: notificationType,
         userId: notification.userId,
         debtId: notification.debtId,
         debtName: notification.debt?.name || 'Unknown Debt',
@@ -34,17 +35,17 @@ export async function processPendingNotifications(): Promise<{ processed: number
         daysBefore: notification.daysBefore,
         recipient: {
           email: notification.recipientEmail || notification.user?.email,
-          phone: notification.recipientPhone,
-          name: notification.user?.name,
+          phone: notification.recipientPhone || undefined,
+          name: notification.user?.name || undefined,
         },
       };
 
-      if (notification.type === 'EMAIL') {
+      if (notificationType === 'EMAIL') {
         result = await service.sendEmailNotification(payload);
-      } else if (notification.type === 'WHATSAPP') {
+      } else if (notificationType === 'WHATSAPP') {
         result = await service.sendWhatsAppNotification(payload);
       } else {
-        throw new Error(`Unsupported notification type: ${notification.type}`);
+        throw new Error(`Unsupported notification type: ${notificationType}`);
       }
 
       if (result.success) {
@@ -58,10 +59,7 @@ export async function processPendingNotifications(): Promise<{ processed: number
           },
         });
 
-        trackDebtEvent('debt_notification_sent', {
-          type: notification.type,
-          daysBefore: notification.daysBefore,
-        });
+        trackDebtEvent('debt_notification_sent');
 
         processed++;
       } else {

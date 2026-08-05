@@ -16,13 +16,13 @@ type CreateNotificationInput = z.infer<typeof createNotificationSchema>;
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const debtId = params.id;
+    const { id: debtId } = await params;
     const userId = session.user.id;
 
     // Verify debt ownership
@@ -51,13 +51,13 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const debtId = params.id;
+    const { id: debtId } = await params;
     const userId = session.user.id;
 
     // Verify debt ownership
@@ -156,13 +156,13 @@ export async function POST(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const debtId = params.id;
+    const { id: debtId } = await params;
     const userId = session.user.id;
     const { searchParams } = new URL(req.url);
     const notificationId = searchParams.get('notificationId');

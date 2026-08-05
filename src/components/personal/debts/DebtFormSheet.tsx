@@ -124,6 +124,7 @@ export default function DebtFormSheet({ open, onClose, onSuccess, debtId }: Debt
       originalPrincipal: Number(formData.originalPrincipal),
       currentPrincipal: Number(formData.currentPrincipal),
       annualInterestRate: formData.annualInterestRate ? Number(formData.annualInterestRate) : null,
+      paymentFrequency: formData.paymentFrequency || null,
       scheduledPayment: formData.scheduledPayment ? Number(formData.scheduledPayment) : null,
       numberOfInstallments: formData.numberOfInstallments ? Number(formData.numberOfInstallments) : null,
       counterpartyName: formData.counterpartyName || null,
