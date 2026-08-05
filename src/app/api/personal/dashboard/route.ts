@@ -194,6 +194,66 @@ export async function GET(req: NextRequest) {
 
     const monthlyFlow = Array.from(flowAgg.values());
 
+    // ─── Deudas Pendientes ────────────────────────────────────────────────────
+    const debtAccounts = await prisma.debtAccount.findMany({
+      where: { userId, status: "ACTIVE" },
+      include: { installments: true, payments: true },
+      orderBy: { nextDueDate: "asc" },
+    });
+
+    let totalPayable = 0;
+    let totalReceivable = 0;
+    let mostUrgent: any = null;
+    const overdueDebts: any[] = [];
+    let nextDueDate: Date | null = null;
+
+    for (const debt of debtAccounts) {
+      const balance = Number(debt.currentPrincipal || 0);
+
+      if (debt.direction === "PAYABLE") {
+        totalPayable += balance;
+      } else {
+        totalReceivable += balance;
+      }
+
+      // Track most urgent (soonest due date, payable only)
+      if (debt.direction === "PAYABLE" && debt.nextDueDate) {
+        if (!nextDueDate || debt.nextDueDate < nextDueDate) {
+          nextDueDate = debt.nextDueDate;
+        }
+        if (!mostUrgent || (debt.nextDueDate && debt.nextDueDate < (mostUrgent.nextDueDate || new Date()))) {
+          mostUrgent = {
+            id: debt.id,
+            name: debt.name,
+            type: debt.type,
+            currentPrincipal: balance,
+            originalPrincipal: Number(debt.originalPrincipal || 0),
+            nextDueDate: debt.nextDueDate,
+          };
+        }
+      }
+
+      // Track overdue (vencidas)
+      if (debt.direction === "PAYABLE" && debt.nextDueDate && debt.nextDueDate < now) {
+        const daysOverdue = Math.floor((now.getTime() - debt.nextDueDate.getTime()) / (1000 * 60 * 60 * 24));
+        overdueDebts.push({
+          id: debt.id,
+          name: debt.name,
+          type: debt.type,
+          daysOverdue,
+        });
+      }
+    }
+
+    const debts = {
+      totalPayable,
+      totalReceivable,
+      nextDueDate,
+      overdueCount: overdueDebts.length,
+      mostUrgent,
+      overdue: overdueDebts.slice(0, 5), // Top 5 overdue
+    };
+
     return NextResponse.json({
       filters: { from, to },
       totalCount,
@@ -211,6 +271,7 @@ export async function GET(req: NextRequest) {
       flowGranularity: granularity,
       upcoming,
       recent,
+      debts,
     });
   } catch (error) {
     console.error("[personal/dashboard]", error);

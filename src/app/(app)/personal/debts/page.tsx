@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { trackDebtEvent } from "@/lib/analytics";
 import Header from "@/components/layout/Header";
 import DebtSummaryCards from "@/components/personal/debts/DebtSummaryCards";
 import DebtListTable from "@/components/personal/debts/DebtListTable";
@@ -53,6 +54,29 @@ export default function DebtsPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    // Track filter usage when any filter changes
+    if (searchTerm) {
+      trackDebtEvent('debt_filter_used', {
+        filter_type: 'search',
+        filter_value: 'search_applied',
+      });
+    }
+    if (typeFilter.length > 0) {
+      trackDebtEvent('debt_filter_used', {
+        filter_type: 'type',
+        filter_value: typeFilter[0],
+      });
+    }
+    if (statusFilter) {
+      trackDebtEvent('debt_filter_used', {
+        filter_type: 'status',
+        filter_value: statusFilter,
+      });
+    }
+  }, [searchTerm, typeFilter, statusFilter]);
+
 
   const fetchData = async () => {
     try {

@@ -26,6 +26,12 @@ interface PersonalCard {
   dueDay: number;
   active: boolean;
 }
+interface DebtAccount {
+  id: string;
+  name: string;
+  type: string;
+}
+
 interface PersonalPayment {
   id: string;
   folio: string;
@@ -44,6 +50,9 @@ interface PersonalPayment {
   notes: string | null;
   receipt: string | null;
   createdAt: string;
+
+  relatedDebtId: string | null;
+  relatedDebt: DebtAccount | null;
 }
 
 const EMPTY_PERSONAL_PAYMENT_VALUES = {
@@ -336,6 +345,7 @@ export default function PersonalPaymentsPage() {
   const [filterCategory, setFilterCategory] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterMethod, setFilterMethod] = useState("");
+  const [filterDebtOnly, setFilterDebtOnly] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<PersonalPayment | null>(null);
@@ -350,6 +360,7 @@ export default function PersonalPaymentsPage() {
     if (filterCategory) params.set("categoryId", filterCategory);
     if (filterStatus) params.set("status", filterStatus);
     if (filterMethod) params.set("paymentMethod", filterMethod);
+    if (filterDebtOnly) params.set("debtId", "!null"); // Filter to only payments with relatedDebtId
     const res = await fetch(`/api/personal/payments?${params}`);
     const data = await res.json();
     setPayments(Array.isArray(data) ? data : []);
@@ -448,6 +459,10 @@ export default function PersonalPaymentsPage() {
             <option value="">Todas las formas</option>
             {METHODS.map((m) => <option key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</option>)}
           </select>
+                  <select className="input" value={filterDebtOnly ? "debt" : ""} onChange={(e) => setFilterDebtOnly(e.target.value === "debt")}>
+            <option value="">Todos los tipos</option>
+            <option value="debt">Abonos a deudas</option>
+          </select>
         </div>
       </div>
 
@@ -488,6 +503,11 @@ export default function PersonalPaymentsPage() {
                       <span className="text-xs text-gray-500">{p.category?.name}</span>
                     </div>
                     <StatusBadge status={p.status} />
+                    {p.relatedDebtId && (
+                      <Link href={`/personal/debts/${p.relatedDebtId}`} className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors">
+                        Abono a deuda
+                      </Link>
+                    )}
                     {p.dueDate && (
                       <span className="text-xs text-gray-400">Vence: {formatDate(p.dueDate)}</span>
                     )}
@@ -553,7 +573,12 @@ export default function PersonalPaymentsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 font-semibold whitespace-nowrap">{formatCurrency(p.amount)}</td>
-                      <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
+                      <td className="px-4 py-3"><StatusBadge status={p.status} />
+                    {p.relatedDebtId && (
+                      <Link href={`/personal/debts/${p.relatedDebtId}`} className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors">
+                        Abono a deuda
+                      </Link>
+                    )}</td>
                       <td className="px-4 py-3">
                         <p className="text-gray-600 whitespace-nowrap">{PAYMENT_METHOD_LABELS[p.paymentMethod] ?? p.paymentMethod}</p>
                         {p.card && (

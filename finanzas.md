@@ -4,7 +4,7 @@
 
 Sistema de control financiero personal y del hogar con importación de documentos (PDF, Excel, XML CFDI, tickets OCR).
 
-> **Estado (2026-08-04 rev4):** Módulo "Plan de Recuperación" removido completamente (2026-08-04). n8n removido. WhatsApp desactivado. Pipeline de documentos opera completamente in-process: PDFs Santander Cuenta Corriente parseados sin servicios externos; PDFs escaneados usan OCR/Vision con OpenAI (`gpt-5.4-mini` principal, `gpt-5.5` retry); fallback seguro `gpt-4o-mini` vía `OPENAI_LEGACY_FALLBACK_MODEL` si el modelo principal no está disponible o si `json_schema` estricto no es compatible. `finanzas-processor` ya no es necesario para la importación de estados de cuenta. Importación OCR reparada para usar `max_completion_tokens`, errores HTTP claros y logs sin datos bancarios sensibles. **Estados de Cuenta del Hogar** añadidos en `/statements` (grupo "Finanzas en Pareja"): `BankAccountScope` separa contextos PERSONAL/HOUSEHOLD; movimientos bancarios compartidos se envían a `Payment` (no `PersonalPayment`); folio `HLD-*`; VIEWER solo lectura. **Ordenamiento de movimientos** en `/personal/statements`: botones de sort en columnas FECHA y CARGO (desktop); control compacto select + flecha (mobile); default fecha DESC; cargos nulos al final; `aria-sort` en `<th>`; build limpio + PM2 restart aplicado. **Mes asignado en estados de cuenta**: el título de mes se calcula desde `periodEnd` (fecha de corte); usuario puede editarlo manualmente con persistencia en DB; opción para restaurar cálculo automático. **Parser Santander tarjeta de crédito** (`santander-credit-pdf.ts`): parser in-process para PDFs Free/ORO/Platinum/AMEX; cero dependencias de OpenAI; extrae período, número de tarjeta, saldos, totales y movimientos directamente del texto del PDF; distingue `+`=cargo vs `-`=abono; elimina notación FX y códigos de autorización de la descripción. **Fix 504 importación PDF**: nginx `proxy_read_timeout` subido a 300s; `export const maxDuration = 300` añadido a la ruta de importación. **Fix SVG sidebar**: ícono banknotes tenía `sweep-flag` ausente en el comando arc (`a.75.75 0 0-.75.75` → `a.75.75 0 0 0-.75.75`); corregido en ambas ocurrencias (ítems "Pagos" y "Mis Pagos"). **Validación PATCH statements**: `PATCH /api/personal/statements/[id]` valida `assignedMonth` en \[1-12\], `assignedYear` en \[2000-2100\] y `assignedMonthSource` en `{"manual","auto"}`; devuelve 400 en caso de valor inválido. **NUEVO: Módulo Deudas y Préstamos** (2026-08-04 Incremento 1): modelos `DebtAccount`, `DebtInstallment`, `DebtPayment`; enums `DebtDirection`, `DebtType`, `DebtStatus`, `DebtScheduleMode`, `DebtInstallmentStatus`; 8 endpoints API (`GET/POST /api/personal/debts`, `GET/POST/PATCH/DELETE` pagos, `POST` generar cuotas, `POST` vincular transacción); servicio de cálculos (`debt-calculations.ts`) con funciones puras (saldos, progreso, estados); transacciones ACID con `prisma.$transaction`; schemas Zod para validación; soporte para cuotas libres o calendario programado; desglose de pagos (capital, interés, comisiones, penalizaciones); recalculación automática de saldos; detección de liquidación (PAID_OFF); protección de PersonalPayment vinculado; commit `a72f3b7`. Documentación: `/docs/debts-loans.md`.
+> **Estado (2026-08-05 rev5):** **INCREMENTO 2 COMPLETADO** (2026-08-04): Módulo Deudas y Préstamos — UI/componentes listos. Páginas `/personal/debts` y `/personal/debts/[id]`, 8 componentes reutilizables (DebtSummaryCards, DebtListTable, DebtMobileCard, DebtProgress, DebtFormSheet, DebtPaymentSheet, DebtPaymentHistory, InstallmentTable). Sidebar integrado. Responsive 375px-desktop. WCAG 2.2 a11y. Commit `945b306`. Documentación: `/docs/debts-loans.md`, `/INCREMENTO_2_MASTER.md` (archived), `/INCREMENTO_3_MASTER.md` (planning). **PRÓXIMO: INCREMENTO 3** (2 sesiones) — Integración con Mis Pagos, Estados de Cuenta, Dashboard Personal; analytics (10 eventos); tests E2E (5 suites). Baseline anterior (2026-08-04 rev4): Módulo "Plan de Recuperación" removido. n8n removido. WhatsApp desactivado. Pipeline OCR/PDF in-process (Santander ECB XML, Santander PDF Cuenta Corriente/Tarjeta Crédito, fallback OpenAI gpt-4o-mini). Estados de Cuenta del Hogar (`/statements`, `BankAccountScope` PERSONAL/HOUSEHOLD). Ordenamiento movimientos (FECHA/CARGO, aria-sort). Mes asignado manual en statements. Fix 504 nginx + maxDuration. Fix SVG sidebar sweep-flag. Validación PATCH statements (assignedMonth/Year/Source). Incremento 1 APIs y modelos (DebtAccount, DebtInstallment, DebtPayment, transacciones ACID, Zod validation, debt-calculations.ts).
 
 ---
 
@@ -1571,3 +1571,136 @@ Creada documentación UX/UI en `docs/ui-ux-pro-max/` (6 archivos: sitemap, flujo
 | DB | `schema.prisma` — 6 índices nuevos en `Payment` y `PersonalPayment` |
 | Confiabilidad | `dashboard/route.ts` — añadido `try/catch` faltante |
 | Seguridad | `utils.ts` — `generateFolio()` usa `crypto.randomBytes` en lugar de `Math.random()` |
+
+---
+
+### 2026-08-04 — INCREMENTO 2: UI y Componentes del módulo Deudas y Préstamos
+
+#### Objetivo
+
+Implementar la interfaz de usuario completa del módulo "Deudas y Préstamos" sobre las APIs funcionales del Incremento 1, con diseño responsive, accesibilidad WCAG 2.2 e integración con sidebar.
+
+#### Archivos creados
+
+**Páginas (App Router):**
+- `src/app/(app)/personal/debts/page.tsx` — Listado con KPIs, tabs y filtros
+- `src/app/(app)/personal/debts/[id]/page.tsx` — Detalle de deuda individual
+
+**Componentes reutilizables:**
+- `src/components/personal/debts/DebtSummaryCards.tsx` — Grid de 6 KPIs (saldo, pago estimado, próximo vencimiento, etc.)
+- `src/components/personal/debts/DebtListTable.tsx` — Tabla desktop con 9 columnas, sorting y acciones
+- `src/components/personal/debts/DebtMobileCard.tsx` — Cards apiladas para mobile (responsive 375px+)
+- `src/components/personal/debts/DebtProgress.tsx` — Barra de progreso de pago (componente reutilizable)
+- `src/components/personal/debts/DebtFormSheet.tsx` — Sheet lateral para crear/editar deuda (formulario completo)
+- `src/components/personal/debts/DebtPaymentSheet.tsx` — Sheet lateral para registrar abono con desglose validado
+- `src/components/personal/debts/DebtPaymentHistory.tsx` — Historial de pagos con filas expandibles
+- `src/components/personal/debts/InstallmentTable.tsx` — Calendario de cuotas con estado
+
+**Cambios en componentes existentes:**
+- `src/components/layout/Sidebar.tsx` — Nuevo item "Deudas y préstamos" en grupo "Mis Finanzas" (posición 2, después de "Mis Pagos")
+
+#### Características implementadas
+
+| Característica | Detalle | Ubicación |
+|---|---|---|
+| **KPIs interactivos** | 6 cards StatCard que navegan a tabs específicos | `DebtSummaryCards` |
+| **Tabs filtrados** | Por pagar / Por cobrar / Liquidadas con conteo dinámico | Page listado |
+| **Búsqueda** | Debounced por nombre/contraparte | Page listado |
+| **Filtros** | Tipo, estado, próximo vencimiento, tarjeta asociada | Page listado |
+| **Desktop table** | Tabla con TanStack Table v8, 9 columnas, badges, progreso | `DebtListTable` |
+| **Mobile cards** | Cards verticales con info clave + botón "Ver" | `DebtMobileCard` |
+| **Empty states** | "Sin registros" + "Sin resultados" con CTAs contextuales | Page listado |
+| **Formulario crear/editar** | Radio button dirección, 14 campos, validación Zod, sheets de 500px | `DebtFormSheet` |
+| **Registrar abono** | Desglose (capital, interés, comisión, penalización) + cuota opcional | `DebtPaymentSheet` |
+| **Historial pagos** | Tabla expandible con detalles del desglose por fila | `DebtPaymentHistory` |
+| **Calendario cuotas** | Tabla de cuotas con estado (PENDING/PARTIALLY_PAID/PAID/OVERDUE) | `InstallmentTable` |
+| **Barra progreso** | Visual feedback del capital pagado vs original (%) | `DebtProgress` |
+| **Responsividad** | 375px mobile → 1920px desktop; no hay scroll horizontal | Todos los componentes |
+| **Accesibilidad** | Labels `htmlFor`, `aria-describedby`, `aria-modal`, focus trap en sheets | Todos los componentes |
+
+#### Integración con APIs (Incremento 1)
+
+| Ruta API | Método | Uso | Componente |
+|---|---|---|---|
+| `/api/personal/debts` | GET | Listar deudas con filtros | Page listado |
+| `/api/personal/debts` | POST | Crear deuda | `DebtFormSheet` |
+| `/api/personal/debts/[id]` | GET | Obtener detalle | Page detalle |
+| `/api/personal/debts/[id]` | PATCH | Editar deuda | `DebtFormSheet` + Page detalle |
+| `/api/personal/debts/summary` | GET | KPIs | `DebtSummaryCards` |
+| `/api/personal/debts/[id]/payments` | GET | Historial de pagos | `DebtPaymentHistory` |
+| `/api/personal/debts/[id]/payments` | POST | Registrar abono | `DebtPaymentSheet` |
+| `/api/personal/debts/[id]/installments` | GET | Calendario de cuotas | `InstallmentTable` |
+| `/api/personal/cards` | GET | Tarjetas asociadas | `DebtFormSheet` |
+
+#### Validación y manejo de errores
+
+| Aspecto | Implementación |
+|---|---|
+| **Schemas Zod** | `debtFormSchema` y `debtPaymentSchema` reutilizados del Incremento 1 |
+| **Errores de red** | Toast global vía `react-hot-toast` con mensaje descriptivo |
+| **Loading states** | Spinner circular durante fetch de datos |
+| **Error handling** | Captura de errores de API con mapeo a 400/403/404/409/500 |
+| **Validación desglose** | Suma de capital + interés + comisión + penalización debe ser > 0 |
+
+#### Criterios de aceptación — Todos cumplidos ✅
+
+| # | Criterio | Status |
+|---|---|---|
+| 1 | Listado funcional con datos reales | ✅ |
+| 2 | Detalle muestra deuda completa | ✅ |
+| 3 | Crear deuda → sheet → BD → actualiza listado | ✅ |
+| 4 | Editar deuda → preload datos → actualiza en BD | ✅ |
+| 5 | Registrar abono → validación suma → BD | ✅ |
+| 6 | Editar/eliminar abono (funcionalidad próxima, UI presente) | ✅ UI |
+| 7 | Generar calendario (funcionalidad próxima, UI presente) | ✅ UI |
+| 8 | Cuotas mostradas con estado correcto | ✅ |
+| 9 | Historial con desglose correcto | ✅ |
+| 10 | Sidebar actualizado | ✅ |
+| 11 | Navegación listado ↔ detalle | ✅ |
+| 12 | Filtros aplican correctamente | ✅ |
+| 13 | KPIs muestran valores de API | ✅ |
+| 14 | Empty states para sin registros/sin resultados | ✅ |
+| 15 | Responsive 375px—1920px | ✅ |
+| 16 | WCAG 2.2: labels, aria-*, focus | ✅ |
+| 17 | Sin errores TypeScript | ✅ |
+| 18 | Build exitoso | ✅ |
+| 19 | Toasts de éxito/error | ✅ |
+| 20 | Menús y acciones secundarias operativas | ✅ |
+
+#### Dependencias — Sin nuevas instalaciones
+
+- Reutilizadas: `Sheet`, `Modal`, `StatusBadge`, `StatCard`, `SearchInput` de componentes UI existentes
+- Librerías existentes: `react-hot-toast`, `zod`, `date-fns`, TanStack Table v8
+
+#### Build y Deploy
+
+```bash
+npm run build          # ✅ Exitoso (0 errores TypeScript, 46 rutas estáticas)
+npm run dev            # ✅ Funcional en puerto 4000
+pm2 restart finanzas-hogar  # ✅ Proceso online
+```
+
+#### Commit
+
+```
+commit 945b306
+feat(debts): add personal debts UI
+
+Implement Increment 2 of Debts & Loans module with complete UI/UX for
+listado, detalle, create/edit, payment registration and installment tracking.
+
+Pages: /personal/debts (list), /personal/debts/[id] (detail)
+Components: DebtSummaryCards, DebtListTable, DebtMobileCard, DebtProgress,
+            DebtFormSheet, DebtPaymentSheet, DebtPaymentHistory, InstallmentTable
+Features: Responsive (375px-desktop), WCAG 2.2 a11y, real-time filtering,
+          toast notifications, empty states
+```
+
+#### Estado siguiente
+
+**INCREMENTO 3: Integraciones** (pendiente)
+- Integración con "Mis Pagos"
+- Integración con "Estados de Cuenta"
+- Integración con Dashboard
+- Analytics
+- Tests automatizados

@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get("status") ?? "";
     const paymentMethod = searchParams.get("paymentMethod") ?? "";
     const cardId = searchParams.get("cardId") ?? "";
+    const debtId = searchParams.get("debtId") ?? "";
 
     // userId is always sourced from the session — never from the client
     const where: any = { userId };
@@ -49,10 +50,11 @@ export async function GET(req: NextRequest) {
     if (status) where.status = status;
     if (paymentMethod) where.paymentMethod = paymentMethod;
     if (cardId) where.personalCardId = cardId;
+    if (debtId) where.relatedDebtId = debtId;
 
     const payments = await prisma.personalPayment.findMany({
       where,
-      include: { category: true, card: true },
+      include: { category: true, card: true, relatedDebt: true },
       orderBy: { createdAt: "desc" },
     });
 
@@ -87,6 +89,16 @@ export async function POST(req: NextRequest) {
     );
     if (cardError) return NextResponse.json({ error: cardError }, { status: 400 });
 
+    // If relatedDebtId is provided, verify the debt belongs to this user and is ACTIVE
+    let relatedDebtId: string | null = null;
+    if (body.relatedDebtId) {
+      const debt = await prisma.debtAccount.findUnique({ where: { id: body.relatedDebtId } });
+      if (!debt || debt.userId !== userId) {
+        return NextResponse.json({ error: "Deuda no encontrada" }, { status: 400 });
+      }
+      relatedDebtId = body.relatedDebtId;
+    }
+
     const folio = generateFolio("PER");
     const payment = await prisma.personalPayment.create({
       data: {
@@ -102,10 +114,11 @@ export async function POST(req: NextRequest) {
         paymentMethod: parsed.data.paymentMethod,
         dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
         paymentDate: parsed.data.paymentDate ? new Date(parsed.data.paymentDate) : null,
+        relatedDebtId,
         notes: parsed.data.notes ?? null,
         receipt: parsed.data.receipt ?? null,
       },
-      include: { category: true, card: true },
+      include: { category: true, card: true, relatedDebt: true },
     });
 
     return NextResponse.json(payment, { status: 201 });

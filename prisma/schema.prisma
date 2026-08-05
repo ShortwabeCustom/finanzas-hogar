@@ -264,6 +264,7 @@ model PersonalPayment {
   type              String?
   financialClass    FinancialClass?
   bankTransactionId String?         @unique
+  relatedDebtId     String?         // FK a DebtAccount — vinculación con abonos de deuda
   sourceStatementId String?
   importedFromBank  Boolean         @default(false)
   createdAt         DateTime        @default(now())
@@ -273,12 +274,14 @@ model PersonalPayment {
   category        PersonalCategory @relation(fields: [categoryId], references: [id])
   card            PersonalCard?    @relation(fields: [personalCardId], references: [id])
   bankTransaction BankTransaction? @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
+  relatedDebt     DebtAccount?     @relation(fields: [relatedDebtId], references: [id], onDelete: SetNull)
   debtPayment     DebtPayment?
 
   @@index([userId])
   @@index([userId, status])
   @@index([userId, paymentDate])
   @@index([userId, createdAt])
+  @@index([relatedDebtId])
 }
 
 // ─── PERSONAL CARDS ────────────────────────────────────────────────────────────
@@ -391,29 +394,33 @@ model BankStatement {
 }
 
 model BankTransaction {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   statementId     String
   accountId       String
-  transactionDate DateTime @db.Date
+  transactionDate DateTime  @db.Date
   description     String
   reference       String?
-  chargeAmount    Decimal? @db.Decimal(14, 2)
-  creditAmount    Decimal? @db.Decimal(14, 2)
-  balance         Decimal? @db.Decimal(14, 2)
+  chargeAmount    Decimal?  @db.Decimal(14, 2)
+  creditAmount    Decimal?  @db.Decimal(14, 2)
+  balance         Decimal?  @db.Decimal(14, 2)
   category        String?
-  rawOcrText      String?  @db.Text
+  rawOcrText      String?   @db.Text
   txnHash         String?
-  createdAt       DateTime @default(now())
+  relatedDebtId   String?   // FK a DebtAccount — vinculación manual con deuda
+  linkedManuallyAt DateTime? // Timestamp cuando fue vinculado manualmente
+  createdAt       DateTime  @default(now())
 
   statement       BankStatement    @relation(fields: [statementId], references: [id], onDelete: Cascade)
   account         BankAccount      @relation(fields: [accountId], references: [id], onDelete: Cascade)
   personalPayment PersonalPayment?
   payment         Payment?
+  relatedDebt     DebtAccount?     @relation(fields: [relatedDebtId], references: [id], onDelete: SetNull)
 
   @@unique([statementId, txnHash])
   @@index([accountId])
   @@index([statementId])
   @@index([transactionDate])
+  @@index([relatedDebtId])
 }
 
 // ─── PERSONAL DEBTS AND LOANS ──────────────────────────────────────────────────
@@ -479,10 +486,12 @@ model DebtAccount {
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
-  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  personalCard PersonalCard?     @relation(fields: [personalCardId], references: [id], onDelete: SetNull)
-  installments DebtInstallment[]
-  payments     DebtPayment[]
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  personalCard      PersonalCard?     @relation(fields: [personalCardId], references: [id], onDelete: SetNull)
+  installments      DebtInstallment[]
+  payments          DebtPayment[]
+  linkedPayments    PersonalPayment[] // Abonos vinculados
+  linkedTransactions BankTransaction[] // Transacciones vinculadas
 
   @@index([userId, status])
   @@index([userId, direction])

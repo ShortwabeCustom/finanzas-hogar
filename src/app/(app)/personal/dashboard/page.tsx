@@ -10,6 +10,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import Header from "@/components/layout/Header";
 import { formatCurrency, formatDate, PAYMENT_METHOD_LABELS } from "@/lib/utils";
 
+import DebtsPendingSection from "@/components/personal/dashboard/DebtsPendingSection";
 const METHOD_COLORS: Record<string, string> = {
   CASH: "#22c55e",
   CREDIT_CARD: "#6366f1",
@@ -315,6 +316,11 @@ export default function PersonalDashboardPage() {
       </div>
 
       <div className="card p-6">
+
+      {/* Deudas Pendientes */}
+      {data?.debts && <DebtsPendingSection debts={data.debts} />}
+
+      
         <h2 className="text-base font-semibold text-gray-900 mb-4">
           {timeFilter === "week" ? "Flujo diario: gastado vs recibido" : timeFilter === "month" ? "Flujo semanal: gastado vs recibido" : "Flujo mensual: gastado vs recibido"}
         </h2>
