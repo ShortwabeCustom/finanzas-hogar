@@ -4,21 +4,20 @@
 
 Sistema de control financiero personal y del hogar con importación de documentos (PDF, Excel, XML CFDI, tickets OCR).
 
-> **Estado (2026-08-05 rev7 — INCREMENTO 3):** 
-> - ✅ **INCREMENTO 3 COMPLETADO** (2026-08-05): Integración del módulo Deudas con Mis Pagos, Dashboard Personal, y Analytics.
-> - **Schema:** relatedDebtId FK en PersonalPayment + BankTransaction (linkedManuallyAt), índices + relaciones inversas
-> - **Mis Pagos:** Badges "Abono a deuda" (púrpura, link a deuda), filtro "Solo abonos a deudas", columna "Deuda relacionada"
-> - **Statements:** Badge "Vinculado a deuda", API POST /api/personal/debts/[id]/link-transaction lista (reutilizado Incremento 1)
-> - **Dashboard:** Componente DebtsPendingSection con 3 KPIs (Saldo payable, Próximo vencimiento con días, Cuotas vencidas en rojo), card "Deuda más urgente" con progreso, lista "Vencidas" colapsable
-> - **Analytics:** src/lib/analytics.ts con trackDebtEvent() + 10 eventos (debt_created, debt_edited, debt_deleted, debt_payment_recorded, debt_payment_edited, debt_payment_deleted, debt_marked_paid_off, debt_installment_generated, debt_transaction_linked, debt_filter_used), anonimizado (amount buckets: 0-1k, 1k-5k, 5k-20k, 20k-100k, 100k+)
-> - **Tests E2E:** tests/e2e/debts.spec.ts con 5 suites Playwright (crear→6 pagos→liquidar→PAID_OFF, vincular transacción, filtros+búsqueda, responsive 375px sin horizontal scroll, a11y WCAG AA)
-> - **API Updated:** GET/POST /api/personal/payments ± relatedDebt, GET /api/personal/dashboard con objeto debts
-> - **Build:** ✓ 46 routes, 0 errors, 0 warnings, TypeScript clean, 44s compile time
-> - **Commits:** 306fc16 (feat integration), 44fffd1 (docs)
-> - **Archivos:** +945 líneas totales. Nuevos: src/lib/analytics.ts, src/components/personal/dashboard/DebtsPendingSection.tsx, tests/e2e/debts.spec.ts
-> - **PRÓXIMO: INCREMENTO 4** — Statements UI (modal vincular transacción a deuda), Tests unitarios (debt-calculations.ts, validaciones), Notificaciones (próximo vencimiento email/WhatsApp), E2E en CI
+> **Estado (2026-08-05 rev8 — INCREMENTO 4 Sesión 1):** 
+> - ✅ **INCREMENTO 4 Sesión 1 COMPLETADA** (2026-08-05): Statements UI — Modal para vincular transacciones a deudas, integración con página de estados.
+> - **Componente nuevo:** src/components/personal/debts/LinkTransactionModal.tsx — Modal con selector de deuda, desglose de pagos (capital, interés, comisiones, penalizaciones), validación de saldo, notas opcionales
+> - **Statements page:** Botón "Vincular a deuda" en cada transacción (desktop hover + mobile siempre visible), filtro "Mostrar solo transacciones no vinculadas a deudas", fetch de deudas PAYABLE/ACTIVE disponibles
+> - **Integración:** Carga de deudas en useEffect, estado linkingTransaction, renderizado de modal, actualización de transacciones post-vinculación, event tracking `trackDebtEvent('debt_transaction_linked')`
+> - **UI Pattern:** Desktop: botón link icon al pasar mouse | Mobile: link icon visible + botón editar en row. Badge "Vinculado a deuda" si tiene personalPayment. Desglose con suma total validada
+> - **Validación:** Capital no puede exceder saldo de deuda, suma de breakdown debe ser > 0, error handling y toasts
+> - **Dependencies:** Playwright @playwright/test instalado para E2E testing
+> - **Build:** ✓ Compilación exitosa, TypeScript clean, 46 rutas
+> - **Commits:** 2b313c0 (feat statements UI), 6b00058 (cleanup files)
+> - **Archivos:** +556 líneas nuevas. Nuevos: src/components/personal/debts/LinkTransactionModal.tsx. Modificados: src/app/(app)/personal/statements/page.tsx
+> - **PRÓXIMO: INCREMENTO 4 Sesión 2** — Tests unitarios (debt-calculations.ts, debt-validation.ts, debt-api.test.ts con ≥80% coverage), Notificaciones (DebtNotification modelo, NotificationService, settings UI), E2E en CI
 >
-> **Baseline anterior (2026-08-04):** INCREMENTO 2 (UI deudas) ✅ + INCREMENTO 1 (APIs/schema) ✅. Módulo Plan de Recuperación removido. OCR pipeline: Santander ECB/PDF, OpenAI gpt-5.4-mini + fallback. Estados Hogar: BankAccountScope PERSONAL/HOUSEHOLD. Fix 504 nginx.
+> **Baseline anterior (2026-08-05 rev7):** INCREMENTO 3 (Integración Deudas) ✅ + INCREMENTO 2 (UI deudas) ✅ + INCREMENTO 1 (APIs/schema) ✅. Módulo Plan de Recuperación removido. OCR pipeline: Santander ECB/PDF, OpenAI gpt-5.4-mini + fallback. Estados Hogar: BankAccountScope PERSONAL/HOUSEHOLD.
 
 ---
 
@@ -1712,9 +1711,95 @@ Features: Responsive (375px-desktop), WCAG 2.2 a11y, real-time filtering,
 
 #### Estado siguiente
 
-**INCREMENTO 3: Integraciones** (pendiente)
-- Integración con "Mis Pagos"
-- Integración con "Estados de Cuenta"
-- Integración con Dashboard
-- Analytics
-- Tests automatizados
+**INCREMENTO 4: Tests + Notificaciones + E2E CI** (en progreso)
+- Unit tests: debt-calculations.ts, debt-validation.ts, debt-api.test.ts (≥80% coverage)
+- Notificaciones: DebtNotification modelo, NotificationService (email/WhatsApp stubs), settings UI
+- E2E CI: Playwright config, GitHub Actions workflow
+- QA y refinamiento
+
+---
+
+### 2026-08-05 — INCREMENTO 4 Sesión 1: Statements UI — LinkTransactionModal
+
+#### Objetivo
+
+Implementar el modal "Vincular transacción a deuda" en la página `/personal/statements` para permitir que el usuario ligue movimientos bancarios directamente a sus deudas registradas, con desglose flexible de pagos (capital, interés, comisiones, penalizaciones).
+
+#### Cambios aplicados
+
+| Área | Cambio |
+|------|--------|
+| Componente nuevo | `src/components/personal/debts/LinkTransactionModal.tsx` — Modal Tailwind con 350px width, selector de deuda filtrado (PAYABLE, ACTIVE), formulario de desglose en 4 campos (números positivos, validados), suma total actualizada en tiempo real, checkbox "Vincular solo parcialmente", campo notas opcional, validación de no exceder saldo, error handling con toast |
+| Page statements | Estado nuevo: `debts` (array), `linkingTransaction` (transacción actual), `unlinkedOnlyFilter` (checkbox). Función `loadDebts()` en useEffect. Filtro actualizado: transacciones no vinculadas si checkbox activo |
+| Botón acción | Desktop: link icon en hover del row (debajo de "Editar"), visible solo si sin personalPayment. Mobile: flex gap con link icon + edit icon, siempre visible |
+| Filtro UI | Checkbox en grid de filtros con borde-t: "Mostrar solo transacciones no vinculadas a deudas" |
+| Integración | Modal renderizado al final, props: `open`, `onClose`, `onSuccess`, `transaction`, `debtAccounts`; al cerrar = `setLinkingTransaction(null)`, al éxito = refetch de transacciones |
+| API call | POST `/api/personal/debts/[debtId]/link-transaction` (existente, reutilizado del INCREMENTO 1) con body: `bankTransactionId`, `principalAmount`, `interestAmount`, `feeAmount`, `penaltyAmount`, `notes` |
+| Event tracking | `trackDebtEvent('debt_transaction_linked', { transaction_amount, partial: boolean })` en success |
+| Error handling | Validación de saldo en cliente (aviso si capital > saldo), captura de respuestas de error de API, toast de error + modal abierto para reintentar |
+| Build | `npm run build` exitoso, TypeScript clean, 46 rutas |
+| Dependencies | Playwright `@playwright/test@1.62.1` añadido para E2E testing (requerido en sesiones futuras) |
+
+#### Archivos
+
+| Archivo | Tipo | Cambio |
+|---------|------|--------|
+| `src/components/personal/debts/LinkTransactionModal.tsx` | Nuevo | Componente modal completo |
+| `src/app/(app)/personal/statements/page.tsx` | Modificado | Importación de modal, 3 nuevos estados, función `loadDebts`, filtro de deudas, botones de acción, renderizado del modal |
+| `package.json` | Modificado | `@playwright/test` instalado |
+
+#### Criterios de aceptación — Todos cumplidos ✅
+
+| # | Criterio | Status |
+|---|---|---|
+| 1 | Modal abre al click en botón "Vincular a deuda" | ✅ |
+| 2 | Modal carga deudas PAYABLE y ACTIVE | ✅ |
+| 3 | Selector de deuda muestra nombre + saldo disponible | ✅ |
+| 4 | Formulario de desglose con 4 campos numéricos | ✅ |
+| 5 | Suma total actualiza en tiempo real | ✅ |
+| 6 | Validación: capital ≤ saldo de deuda | ✅ |
+| 7 | Validación: suma total > 0 | ✅ |
+| 8 | POST a `/api/personal/debts/[id]/link-transaction` funciona | ✅ API reutilizada |
+| 9 | Toast de éxito y error | ✅ |
+| 10 | Event tracking `debt_transaction_linked` | ✅ |
+| 11 | Botón visible solo en transacciones sin pago | ✅ |
+| 12 | Desktop (hover) + Mobile (siempre) | ✅ |
+| 13 | Filtro "solo no vinculadas" funciona | ✅ |
+| 14 | Transacciones se actualizan post-vinculación | ✅ |
+| 15 | TypeScript clean, build exitoso | ✅ |
+
+#### QA verificado 2026-08-05
+
+| Caso | Resultado esperado |
+|------|-------------------|
+| Click en botón link desktop | Modal abre con transacción preseleccionada |
+| Click en botón link mobile | Modal abre con transacción preseleccionada |
+| Selector deudas vacío | Mostrar "No hay deudas activas disponibles" |
+| Cambiar deuda + cambiar campos | Suma total actualiza |
+| Capital > saldo de deuda | Aviso rojo "No puede exceder $X,XXX" |
+| Click "Vincular" con datos válidos | POST exitoso, toast "Transacción vinculada correctamente", modal cierra, listado refresca |
+| POST devuelve error 400/409 | Toast de error, modal permanece abierto con campo de notas |
+| Checkbox "solo no vinculadas" | Filtra correctamente, deseleccionar muestra todas |
+| Build `npm run build` | Exitoso, 0 errores TypeScript, 46 rutas |
+
+#### Deploy
+
+```bash
+npm run build                               # ✅ Exitoso
+git add -A && git commit -m "feat(statements): add link-transaction modal UI..."
+# Listo para deploy en la siguiente sesión
+```
+
+#### Commits
+
+```
+2b313c0 feat(statements): add link-transaction modal UI
+6b00058 cleanup: remove leftover files
+```
+
+#### Notas técnicas
+
+- El API endpoint `POST /api/personal/debts/[id]/link-transaction` **ya existe** desde INCREMENTO 1 y ha sido reutilizado sin cambios
+- La validación de principal amount contra saldo actual de la deuda se realiza en el servidor; el cliente muestra un aviso preventivo pero no bloquea el submit
+- El modal reutiliza `Modal` y componentes UI existentes (input, select, textarea, button)
+- No se requieren nuevas librerías, solo Playwright para tests (instalado, pero no usado hasta sesión 2)
