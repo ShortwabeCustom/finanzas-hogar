@@ -23,16 +23,25 @@ Sistema de control financiero personal y del hogar con importación de documento
 >   - **Commits:** Cambios en 7 componentes, 2 helpers creados
 >   - **Próximo:** Fase 3-4 (comprobante + accesibilidad + tests + responsive)
 >
-> - ✅ **INCREMENTO 4 Sesión 3 COMPLETADA** (2026-08-05): Notificaciones UI + Design System
->   - **UI Settings Page:** `/personal/settings/notifications` con contacto + toggles + historial
->   - **Design System:** Paleta banking (Navy #0F172A + Gold #CA8A04 + Emerald), IBM Plex Sans, dark mode, WCAG 2.2 AA
->   - **Componentes:** Tailwind v4 utilities, Lucide icons, focus rings visibles, 44px+ touch targets, responsive
->   - **Features:** Email/WhatsApp toggles, day-before selectors, currency formatting, date i18n, ARIA labels
->   - **Build:** ✓ Exitoso, TypeScript clean, Lucide instalado
->   - **Commits:** 31fbc20 (feat: notifications UI + tailwind config + fonts)
->   - **Archivos:** +596 líneas. Nuevos: src/app/(app)/personal/settings/notifications.tsx. Modificados: tailwind.config.ts (darkMode + colores), src/app/layout.tsx (IBM Plex Sans), package.json (lucide-react)
->   - **Documentación:** Design System completo, Implementation Guide, Visual Summary
->   - **PRÓXIMO:** INCREMENTO 4 Sesión 4 — Vercel Cron + E2E Tests + QA
+> - ✅ **INCREMENTO 4 Sesión 3 COMPLETADA** (2026-08-05): Safe DB Migration + Vercel Cron + Notifications API
+>   - **Database:** Campo `phone` agregado a User (safe migration sin pérdida de datos); Prisma Client regenerado
+>   - **API Endpoints (3 nuevos):** 
+>     - POST `/api/personal/debts/[id]/notifications/test` → envía notificación de prueba
+>     - GET `/api/personal/notifications/history?limit=20` → historial de notificaciones
+>     - PUT `/api/personal/user/phone` → actualiza teléfono usuario (WhatsApp)
+>   - **Vercel Cron:** 
+>     - Endpoint POST `/api/cron/send-debt-notifications` con auth CRON_SECRET (Bearer token)
+>     - `vercel.json` configurado: schedule `"0 * * * *"` (hourly)
+>     - `processPendingNotifications()` en `cron-processor.ts`: busca PENDING, filtra por fecha, envía, actualiza status (SENT/FAILED)
+>   - **UI Settings:** `/personal/settings/notifications` (dark mode Slate, Lucide icons, responsive)
+>     - Sección contacto: email read-only + phone editable
+>     - Tarjetas por deuda: toggles Email/WhatsApp + day-before selectors (1-7 / 0-3 días)
+>     - Historial: tabla desktop / cards mobile con status + fechas
+>   - **Type Fixes:** Lucide icons (Bell, Mail, Phone, AlertCircle, CheckCircle); Decimal conversions; SendResult type alignment
+>   - **Build:** ✓ 47 segundos, TypeScript clean, 28 commits totales
+>   - **Commits (6):** db migration + 3 endpoints + UI fix + debts update + docs
+>   - **Documentación:** Master prompt migración safe + E2E scaffold (Playwright listo)
+>   - **PRÓXIMO:** INCREMENTO 4 Sesión 4 — E2E Tests + QA Manual + SendGrid/Twilio Integration
 >
 > **Baseline anterior (2026-08-05 rev8):** INCREMENTO 4 Sesión 1 ✅ + INCREMENTO 3 (Integración Deudas) ✅ + INCREMENTO 2 (UI deudas) ✅ + INCREMENTO 1 (APIs/schema) ✅.
 
