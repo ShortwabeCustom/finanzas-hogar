@@ -6,6 +6,7 @@ import Sheet from "@/components/ui/Sheet";
 import { debtPaymentSchema } from "@/lib/validations/debt";
 import { PAYMENT_METHOD_LABELS } from "@/lib/utils";
 import { trackDebtEvent, getAmountBucket } from "@/lib/analytics";
+import { getTodayDateInputValue } from "@/lib/forms/date-helpers";
 
 interface DebtPaymentSheetProps {
   open: boolean;
@@ -46,7 +47,7 @@ export default function DebtPaymentSheet({
   const [cards, setCards] = useState<PersonalCard[]>([]);
   const [installments, setInstallments] = useState<DebtInstallment[]>([]);
   const [formData, setFormData] = useState({
-    paidAt: new Date().toISOString().split("T")[0],
+    paidAt: getTodayDateInputValue(),
     principalAmount: "",
     interestAmount: "0",
     feeAmount: "0",
@@ -155,7 +156,7 @@ export default function DebtPaymentSheet({
       onClose();
       onSuccess();
       setFormData({
-        paidAt: new Date().toISOString().split("T")[0],
+        paidAt: getTodayDateInputValue(),
         principalAmount: "",
         interestAmount: "0",
         feeAmount: "0",
@@ -167,13 +168,26 @@ export default function DebtPaymentSheet({
       });
     } catch (err) {
       if (err instanceof Error) {
-        if (err.message.includes("Parse error")) {
+        // Zod validation error
+        if ("errors" in err && Array.isArray((err as any).errors)) {
           const zodError = err as any;
           const newErrors: Record<string, string> = {};
+
           zodError.errors?.forEach((e: any) => {
-            newErrors[e.path[0]] = e.message;
+            const fieldName = e.path[0] || "unknown";
+            newErrors[fieldName] = e.message;
           });
+
           setErrors(newErrors);
+          toast.error("Revisa los campos marcados");
+
+          // Scroll to first error
+          const firstErrorField = Object.keys(newErrors)[0];
+          if (firstErrorField) {
+            const element = document.getElementById(firstErrorField);
+            element?.scrollIntoView({ behavior: "smooth", block: "center" });
+            element?.focus();
+          }
         } else {
           toast.error(err.message);
         }

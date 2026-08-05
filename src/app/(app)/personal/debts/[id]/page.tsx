@@ -11,6 +11,11 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import DebtProgress from "@/components/personal/debts/DebtProgress";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { calculateDebtProgress, calculateDebtTotals } from "@/lib/financial/debt-calculations";
+import {
+  DEBT_TYPE_LABELS,
+  DEBT_STATUS_LABELS,
+  DEBT_STATUS_COLORS,
+} from "@/lib/financial/debt-labels";
 
 interface DebtAccount {
   id: string;
@@ -53,22 +58,6 @@ interface DebtInstallment {
   totalPaid: number;
   status: string;
 }
-
-const STATUS_LABELS: Record<string, string> = {
-  ACTIVE: "Activa",
-  PAID_OFF: "Liquidada",
-  PAUSED: "Pausada",
-  CANCELLED: "Cancelada",
-  DEFAULTED: "En mora",
-};
-
-const STATUS_BADGE_STYLES: Record<string, string> = {
-  ACTIVE: "bg-green-100 text-green-800",
-  PAID_OFF: "bg-emerald-100 text-emerald-800",
-  PAUSED: "bg-amber-100 text-amber-800",
-  CANCELLED: "bg-gray-100 text-gray-800",
-  DEFAULTED: "bg-red-100 text-red-800",
-};
 
 export default function DebtDetailPage() {
   const params = useParams();
@@ -172,13 +161,13 @@ export default function DebtDetailPage() {
               <p className="text-sm text-gray-500 mt-1">{debt.counterpartyName}</p>
             )}
             <div className="flex items-center gap-2 mt-2">
-              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                {debt.type}
+              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium whitespace-nowrap">
+                {DEBT_TYPE_LABELS[debt.type] || debt.type}
               </span>
               <StatusBadge
                 status={debt.status}
-                labels={STATUS_LABELS}
-                styles={STATUS_BADGE_STYLES}
+                labels={DEBT_STATUS_LABELS}
+                styles={DEBT_STATUS_COLORS}
               />
             </div>
           </div>

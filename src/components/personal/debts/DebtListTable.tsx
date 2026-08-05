@@ -6,6 +6,11 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import DebtProgress from "./DebtProgress";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { calculateDebtProgress } from "@/lib/financial/debt-calculations";
+import {
+  DEBT_TYPE_LABELS,
+  DEBT_STATUS_LABELS,
+  DEBT_STATUS_COLORS,
+} from "@/lib/financial/debt-labels";
 
 interface DebtAccount {
   id: string;
@@ -25,33 +30,6 @@ interface DebtAccount {
 interface DebtListTableProps {
   debts: DebtAccount[];
 }
-
-const DEBT_TYPE_LABELS: Record<string, string> = {
-  PERSONAL_LOAN: "Préstamo Personal",
-  CREDIT_CARD: "Tarjeta de Crédito",
-  AUTO_LOAN: "Préstamo Auto",
-  MORTGAGE: "Hipoteca",
-  BNPL: "Compra Ahora Paga Después",
-  FAMILY_LOAN: "Préstamo Familiar",
-  LOAN_GRANTED: "Préstamo Otorgado",
-  OTHER: "Otro",
-};
-
-const STATUS_BADGE_STYLES: Record<string, string> = {
-  ACTIVE: "bg-green-100 text-green-800",
-  PAID_OFF: "bg-emerald-100 text-emerald-800",
-  PAUSED: "bg-amber-100 text-amber-800",
-  CANCELLED: "bg-gray-100 text-gray-800",
-  DEFAULTED: "bg-red-100 text-red-800",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  ACTIVE: "Activa",
-  PAID_OFF: "Liquidada",
-  PAUSED: "Pausada",
-  CANCELLED: "Cancelada",
-  DEFAULTED: "En mora",
-};
 
 export default function DebtListTable({ debts }: DebtListTableProps) {
   const router = useRouter();
@@ -107,8 +85,8 @@ export default function DebtListTable({ debts }: DebtListTableProps) {
                 <td className="px-6 py-4 text-sm">
                   <StatusBadge
                     status={debt.status}
-                    labels={STATUS_LABELS}
-                    styles={STATUS_BADGE_STYLES}
+                    labels={DEBT_STATUS_LABELS}
+                    styles={DEBT_STATUS_COLORS}
                   />
                 </td>
                 <td className="px-6 py-4 text-sm text-center">

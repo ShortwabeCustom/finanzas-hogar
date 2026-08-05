@@ -218,36 +218,39 @@ export default function DebtsPage() {
 
       {/* Filters */}
       <div className="card p-4 space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <SearchInput
-            placeholder="Buscar por nombre o contraparte..."
-            value={searchTerm}
-            onChange={setSearchTerm}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px_auto] gap-3">
+          <div className="min-w-0">
+            <SearchInput
+              placeholder="Buscar por nombre o contraparte..."
+              value={searchTerm}
+              onChange={setSearchTerm}
+            />
+          </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
+            aria-label="Filtrar por estado de deuda"
           >
             <option value="">Todos los estados</option>
             <option value="ACTIVE">Activo</option>
             <option value="PAUSED">Pausado</option>
             <option value="CANCELLED">Cancelado</option>
           </select>
+          {(searchTerm || statusFilter || typeFilter.length > 0) && (
+            <button
+              onClick={() => {
+                setSearchTerm("");
+                setStatusFilter("");
+                setTypeFilter([]);
+              }}
+              className="px-3 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors whitespace-nowrap"
+              aria-label="Limpiar todos los filtros"
+            >
+              Limpiar
+            </button>
+          )}
         </div>
-
-        {(searchTerm || statusFilter || typeFilter.length > 0) && (
-          <button
-            onClick={() => {
-              setSearchTerm("");
-              setStatusFilter("");
-              setTypeFilter([]);
-            }}
-            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-          >
-            Limpiar filtros
-          </button>
-        )}
       </div>
 
       {/* Empty State */}

@@ -1,5 +1,9 @@
 import StatusBadge from "@/components/ui/StatusBadge";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import {
+  DEBT_INSTALLMENT_STATUS_LABELS,
+  DEBT_INSTALLMENT_STATUS_COLORS,
+} from "@/lib/financial/debt-labels";
 
 interface DebtInstallment {
   id: string;
@@ -13,22 +17,6 @@ interface DebtInstallment {
 interface InstallmentTableProps {
   installments: DebtInstallment[];
 }
-
-const INSTALLMENT_STATUS_LABELS: Record<string, string> = {
-  PENDING: "Pendiente",
-  PARTIALLY_PAID: "Parcialmente Pagada",
-  PAID: "Pagada",
-  OVERDUE: "Vencida",
-  CANCELLED: "Cancelada",
-};
-
-const INSTALLMENT_STATUS_STYLES: Record<string, string> = {
-  PENDING: "bg-blue-100 text-blue-800",
-  PARTIALLY_PAID: "bg-amber-100 text-amber-800",
-  PAID: "bg-green-100 text-green-800",
-  OVERDUE: "bg-red-100 text-red-800",
-  CANCELLED: "bg-gray-100 text-gray-800",
-};
 
 export default function InstallmentTable({ installments }: InstallmentTableProps) {
   if (installments.length === 0) {
@@ -66,8 +54,8 @@ export default function InstallmentTable({ installments }: InstallmentTableProps
                 <td className="px-4 py-3 text-sm">
                   <StatusBadge
                     status={installment.status}
-                    labels={INSTALLMENT_STATUS_LABELS}
-                    styles={INSTALLMENT_STATUS_STYLES}
+                    labels={DEBT_INSTALLMENT_STATUS_LABELS}
+                    styles={DEBT_INSTALLMENT_STATUS_COLORS}
                   />
                 </td>
               </tr>

@@ -6,6 +6,7 @@ import Sheet from "@/components/ui/Sheet";
 import { debtFormSchema } from "@/lib/validations/debt";
 import { PERIOD_LABELS } from "@/lib/utils";
 import { trackDebtEvent, getAmountBucket } from "@/lib/analytics";
+import { toDateInputValue, getTodayDateInputValue } from "@/lib/forms/date-helpers";
 
 interface DebtFormSheetProps {
   open: boolean;
@@ -46,7 +47,7 @@ export default function DebtFormSheet({ open, onClose, onSuccess, debtId }: Debt
     paymentFrequency: "",
     scheduledPayment: "",
     numberOfInstallments: "",
-    startDate: new Date().toISOString().split("T")[0],
+    startDate: getTodayDateInputValue(),
     estimatedEndDate: "",
     personalCardId: "",
     notes: "",
@@ -91,8 +92,8 @@ export default function DebtFormSheet({ open, onClose, onSuccess, debtId }: Debt
           paymentFrequency: data.paymentFrequency || "",
           scheduledPayment: data.scheduledPayment?.toString() || "",
           numberOfInstallments: data.numberOfInstallments?.toString() || "",
-          startDate: data.startDate,
-          estimatedEndDate: data.estimatedEndDate || "",
+          startDate: toDateInputValue(data.startDate),
+          estimatedEndDate: toDateInputValue(data.estimatedEndDate) || "",
           personalCardId: data.personalCardId || "",
           notes: data.notes || "",
         });
@@ -170,13 +171,31 @@ export default function DebtFormSheet({ open, onClose, onSuccess, debtId }: Debt
       onSuccess();
     } catch (err) {
       if (err instanceof Error) {
-        if (err.message.includes("Parse error")) {
+        // Zod validation error
+        if ("errors" in err && Array.isArray((err as any).errors)) {
           const zodError = err as any;
           const newErrors: Record<string, string> = {};
+          const errorMessages: string[] = [];
+
           zodError.errors?.forEach((e: any) => {
-            newErrors[e.path[0]] = e.message;
+            const fieldName = e.path[0] || "unknown";
+            newErrors[fieldName] = e.message;
+
+            // Build friendly error message
+            const fieldLabel = fieldName.replace(/([A-Z])/g, " $1").toLowerCase();
+            errorMessages.push(`${fieldLabel}: ${e.message}`);
           });
+
           setErrors(newErrors);
+
+          // Show summary toast and scroll to first error
+          toast.error("Revisa los campos marcados");
+          const firstErrorField = Object.keys(newErrors)[0];
+          if (firstErrorField) {
+            const element = document.getElementById(firstErrorField);
+            element?.scrollIntoView({ behavior: "smooth", block: "center" });
+            element?.focus();
+          }
         } else {
           toast.error(err.message);
         }
