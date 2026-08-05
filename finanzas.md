@@ -2771,3 +2771,100 @@ git commit -m "docs: update finanzas.md for INCREMENTO 4 Sesión 4"
 **Duración estimada:** 1-2 sesiones  
 **Próximo:** INCREMENTO 5 o Features adicionales (SMS, Push notifications, Email templating)
 
+
+---
+
+### 2026-08-05 — INCREMENTO 4 Sesión 3: Safe Database Migration + Vercel Cron + Notifications API
+
+#### Cambios principales
+
+**Database Migration (Safe — preserva datos)**
+- Campo `phone` agregado a modelo User (nullable TEXT)
+- Migración ejecutada sin `prisma migrate reset` (cero pérdida de datos)
+- Flujo: CREATE-ONLY migration → SQL manual edit → `prisma migrate deploy`
+- Verificación: `npx prisma generate` exitoso, build clean TypeScript
+
+**API Endpoints (3 nuevos)**
+1. `POST /api/personal/debts/[id]/notifications/test` — envía notificación de prueba (test send)
+2. `GET /api/personal/notifications/history` — historial últimas 20 notificaciones
+3. `PUT /api/personal/user/phone` — actualiza teléfono usuario (WhatsApp)
+
+**Vercel Cron Infrastructure**
+- `POST /api/cron/send-debt-notifications` — endpoint con auth CRON_SECRET (Bearer token)
+- `vercel.json` configurado: `"schedule": "0 * * * *"` (hourly)
+- `processPendingNotifications()` en `src/lib/notifications/cron-processor.ts`:
+  - Busca DebtNotification con status=PENDING
+  - Filtra por fecha (sendDate = dueDate - daysBefore)
+  - Envía vía NotificationService
+  - Actualiza status (SENT/FAILED) con logging
+
+**UI Settings — `/personal/settings/notifications`**
+- Sección contacto: email read-only + teléfono editable
+- Tarjeta por deuda: toggles email/WhatsApp + selectors días
+- Historial: tabla (desktop) / cards (mobile) con estado + fechas
+- Dark mode: Slate palette (slate-50/900), Lucide icons
+- ARIA labels, focus rings, 44px+ touch targets
+
+**Type Fixes**
+- Lucide icons: BellIcon→Bell, PhoneIcon→Phone, EnvelopeIcon→Mail, ExclamationCircleIcon→AlertCircle, CheckCircleIcon→CheckCircle
+- Decimal handling: `currentPrincipal` → `parseFloat().toString()` en cron-processor
+- SendResult type: `error?: string` (optional)
+
+#### Archivos creados
+
+| Ruta | Descripción |
+|------|-------------|
+| `prisma/migrations/1785965610706_add_phone_to_user/migration.sql` | SQL safe: ALTER TABLE ADD COLUMN + CREATE INDEX |
+| `src/app/api/personal/user/phone/route.ts` | PUT endpoint para actualizar teléfono usuario |
+| `src/app/api/personal/debts/[id]/notifications/test/route.ts` | POST test notification endpoint |
+| `src/app/api/personal/notifications/history/route.ts` | GET notification history endpoint |
+| `src/lib/notifications/cron-processor.ts` | Scheduler: processPendingNotifications() logic |
+| `INCREMENTO_4_MIGRACION_SAFE_PHONE.md` | Master prompt para migración safe de BD |
+| `docs/ui-ux/`, `docs/backend/` | Documentación auditoría + handoff |
+
+#### Archivos modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `prisma/schema.prisma` | Agregado campo `phone String?` a modelo User |
+| `src/app/(app)/personal/settings/notifications.tsx` | Icon imports corregidos (Lucide v1.28) |
+| `src/app/api/cron/send-debt-notifications/route.ts` | (ya existía, sin cambios) |
+| `src/lib/notifications/notification-service.ts` | (sin cambios) |
+| `vercel.json` | (sin cambios, ya configurado) |
+
+#### Build & Verificación
+
+| Check | Resultado |
+|-------|-----------|
+| `npm run build` | ✓ 47 segundos, TypeScript clean |
+| Prisma tipos | ✓ Regenerado, User.phone disponible |
+| Rutas API | ✓ 3 nuevas endpoints + 1 cron registradas |
+| Git status | ✓ Working tree clean, 28 commits ahead de origin/main |
+
+#### Commits (5 totales)
+
+```
+72b7dd6 feat(db): add phone field to user model with safe migration
+7016b7b feat(notifications): add api endpoints for notification management
+767ae25 feat(cron): add vercel cron endpoint for scheduled notification sending
+9d55d3b fix(ui): correct lucide-react icon imports in notifications settings
+53ce4b1 feat(debts): update debt components with improved date handling
+```
+
+#### Documentación
+
+- ✅ INCREMENTO_4_MIGRACION_SAFE_PHONE.md — Paso a paso para migración sin datos
+- ✅ AUDIT_DEBTS_MODULE.md — Auditoría completa (Sesión 2)
+- ✅ BACKEND_HANDOFF_DEBTS.md — Blocker backend identificado
+- ✅ CHANGES_DEBTS_ITERATION.md — Cambios detallados
+- ✅ E2E tests skeleton — Playwright config lista (tests/e2e/debts.spec.ts)
+
+#### Próximo (Sesión 4 — 1-2 horas)
+
+1. **E2E Tests** — Completar suite Playwright (debts create→pay→liquidate workflow)
+2. **QA Manual** — 30+ checkpoints (settings, cron, mobile, error handling)
+3. **SendGrid/Twilio Integration** — Implementar send real en NotificationService (email/WhatsApp)
+4. **Performance Baselines** — Benchmark cron execution, API response times
+5. **Commit Final** — `docs: update finanzas.md for INCREMENTO 4 Sesión 4`
+
+---
