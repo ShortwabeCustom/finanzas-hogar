@@ -145,14 +145,6 @@ export default function DashboardPage() {
 
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full" />
-      </div>
-    );
-  }
-
   if (error || !data) {
     return (
       <div className="space-y-6">
@@ -161,6 +153,17 @@ export default function DashboardPage() {
           <p className="text-sm text-gray-500 mt-1">Resumen general de finanzas del hogar</p>
         </div>
         <ApiErrorState message={error ?? undefined} onRetry={loadDashboard} />
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div>
+          <div className="animate-spin w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-3" />
+          <p className="text-gray-500 text-sm text-center">Cargando dashboard...</p>
+        </div>
       </div>
     );
   }
