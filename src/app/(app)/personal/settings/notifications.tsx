@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import {
   Bell,
@@ -8,6 +9,8 @@ import {
   AlertCircle,
   Mail,
   Phone,
+  MessageCircle,
+  Loader2,
 } from "lucide-react";
 
 interface DebtAccount {
@@ -34,14 +37,30 @@ interface NotificationConfig {
   whatsappDaysBefore: number;
 }
 
+// Validación de teléfono: formato internacional o Chile
+const validatePhoneNumber = (phone: string): boolean => {
+  if (!phone) return false;
+  const cleaned = phone.replace(/\D/g, "");
+  return cleaned.length >= 9 && cleaned.length <= 15;
+};
+
 export default function NotificationsSettings() {
+  const { data: session } = useSession();
   const [debts, setDebts] = useState<DebtAccount[]>([]);
   const [history, setHistory] = useState<NotificationLog[]>([]);
   const [userEmail, setUserEmail] = useState<string>("");
   const [userPhone, setUserPhone] = useState<string>("");
   const [editingPhone, setEditingPhone] = useState(false);
+  const [phoneSaving, setPhoneSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [testingSend, setTestingSend] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Cargar email desde sesión
+    if (session?.user?.email) {
+      setUserEmail(session.user.email);
+    }
+  }, [session]);
 
   useEffect(() => {
     fetchData();
@@ -72,18 +91,33 @@ export default function NotificationsSettings() {
   };
 
   const handlePhoneSave = async () => {
+    if (userPhone && !validatePhoneNumber(userPhone)) {
+      toast.error("Formato de teléfono inválido (debe tener 9-15 dígitos)");
+      return;
+    }
+
     try {
+      setPhoneSaving(true);
       const res = await fetch("/api/personal/user/phone", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: userPhone }),
+        body: JSON.stringify({ phone: userPhone || null }),
       });
 
-      if (!res.ok) throw new Error("Error al guardar teléfono");
-      toast.success("Teléfono guardado");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Error al guardar teléfono");
+      }
+
+      toast.success("Teléfono guardado exitosamente");
       setEditingPhone(false);
+      // Refrescar datos para actualizar estado de notificaciones
+      await fetchData();
     } catch (error) {
-      toast.error("No se pudo guardar el teléfono");
+      const message = error instanceof Error ? error.message : "No se pudo guardar el teléfono";
+      toast.error(message);
+    } finally {
+      setPhoneSaving(false);
     }
   };
 
@@ -200,9 +234,17 @@ export default function NotificationsSettings() {
                   />
                   <button
                     onClick={handlePhoneSave}
-                    className="px-4 h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors duration-200 cursor-pointer"
+                    disabled={phoneSaving}
+                    className="px-4 h-10 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-medium rounded-lg transition-colors duration-200 cursor-pointer disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    Guardar
+                    {phoneSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      "Guardar"
+                    )}
                   </button>
                 </div>
               )}
@@ -241,6 +283,7 @@ export default function NotificationsSettings() {
                   userPhone={userPhone}
                   onTestSend={() => handleTestSend(debt.id)}
                   isLoading={testingSend === debt.id}
+                  onRefresh={fetchData}
                 />
               ))}
             </div>
@@ -273,6 +316,7 @@ interface DebtNotificationCardProps {
   userPhone: string;
   onTestSend: () => void;
   isLoading?: boolean;
+  onRefresh?: () => Promise<void>;
 }
 
 function DebtNotificationCard({
@@ -280,11 +324,14 @@ function DebtNotificationCard({
   userPhone,
   onTestSend,
   isLoading = false,
+  onRefresh,
 }: DebtNotificationCardProps) {
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [emailDays, setEmailDays] = useState("3");
   const [whatsappEnabled, setWhatsappEnabled] = useState(false);
   const [whatsappDays, setWhatsappDays] = useState("1");
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [savingWhatsapp, setSavingWhatsapp] = useState(false);
 
   const formatCurrency = (value: any) => {
     return new Intl.NumberFormat("es-CL", {
@@ -301,6 +348,139 @@ function DebtNotificationCard({
       month: "short",
       day: "numeric",
     }).format(new Date(date));
+  };
+
+  const handleEmailToggle = async (newValue: boolean) => {
+    setSavingEmail(true);
+    try {
+      const endpoint = newValue
+        ? `/api/personal/debts/${debt.id}/notifications`
+        : `/api/personal/debts/${debt.id}/notifications?type=EMAIL`;
+
+      const method = newValue ? "POST" : "DELETE";
+      const body = newValue
+        ? { type: "EMAIL", daysBefore: parseInt(emailDays) }
+        : undefined;
+
+      const res = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        ...(body && { body: JSON.stringify(body) }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Error al guardar configuración");
+      }
+
+      setEmailEnabled(newValue);
+      toast.success(
+        newValue
+          ? "Notificación por email habilitada"
+          : "Notificación por email cancelada"
+      );
+      await onRefresh?.();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Error al guardar";
+      toast.error(message);
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
+  const handleWhatsappToggle = async (newValue: boolean) => {
+    if (newValue && !userPhone) {
+      toast.error("Configura tu teléfono primero");
+      return;
+    }
+
+    setSavingWhatsapp(true);
+    try {
+      const endpoint = newValue
+        ? `/api/personal/debts/${debt.id}/notifications`
+        : `/api/personal/debts/${debt.id}/notifications?type=WHATSAPP`;
+
+      const method = newValue ? "POST" : "DELETE";
+      const body = newValue
+        ? { type: "WHATSAPP", daysBefore: parseInt(whatsappDays) }
+        : undefined;
+
+      const res = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        ...(body && { body: JSON.stringify(body) }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Error al guardar configuración");
+      }
+
+      setWhatsappEnabled(newValue);
+      toast.success(
+        newValue
+          ? "Notificación por WhatsApp habilitada"
+          : "Notificación por WhatsApp cancelada"
+      );
+      await onRefresh?.();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Error al guardar";
+      toast.error(message);
+    } finally {
+      setSavingWhatsapp(false);
+    }
+  };
+
+  const handleEmailDaysChange = async (days: string) => {
+    setEmailDays(days);
+    if (emailEnabled) {
+      setSavingEmail(true);
+      try {
+        const res = await fetch(`/api/personal/debts/${debt.id}/notifications`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "EMAIL",
+            daysBefore: parseInt(days),
+          }),
+        });
+
+        if (!res.ok) throw new Error("Error al actualizar");
+        toast.success("Configuración actualizada");
+        await onRefresh?.();
+      } catch (error) {
+        toast.error("Error al actualizar configuración");
+      } finally {
+        setSavingEmail(false);
+      }
+    }
+  };
+
+  const handleWhatsappDaysChange = async (days: string) => {
+    setWhatsappDays(days);
+    if (whatsappEnabled) {
+      setSavingWhatsapp(true);
+      try {
+        const res = await fetch(`/api/personal/debts/${debt.id}/notifications`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "WHATSAPP",
+            daysBefore: parseInt(days),
+          }),
+        });
+
+        if (!res.ok) throw new Error("Error al actualizar");
+        toast.success("Configuración actualizada");
+        await onRefresh?.();
+      } catch (error) {
+        toast.error("Error al actualizar configuración");
+      } finally {
+        setSavingWhatsapp(false);
+      }
+    }
   };
 
   return (
@@ -352,15 +532,19 @@ function DebtNotificationCard({
                 id={`email-${debt.id}`}
                 type="checkbox"
                 checked={emailEnabled}
-                onChange={(e) => setEmailEnabled(e.target.checked)}
-                className="w-5 h-5 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 dark:focus:ring-offset-slate-800"
+                onChange={(e) => handleEmailToggle(e.target.checked)}
+                disabled={savingEmail}
+                className="w-5 h-5 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 dark:focus:ring-offset-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Habilitar notificaciones por email"
               />
               <label
                 htmlFor={`email-${debt.id}`}
-                className="font-medium text-slate-900 dark:text-white cursor-pointer"
+                className="font-medium text-slate-900 dark:text-white cursor-pointer flex items-center gap-2"
               >
                 Notificación por Email
+                {savingEmail && (
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                )}
               </label>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-400 ml-7">
@@ -371,8 +555,9 @@ function DebtNotificationCard({
           {emailEnabled && (
             <select
               value={emailDays}
-              onChange={(e) => setEmailDays(e.target.value)}
-              className="h-9 px-3 text-sm border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200"
+              onChange={(e) => handleEmailDaysChange(e.target.value)}
+              disabled={savingEmail}
+              className="h-9 px-3 text-sm border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Días antes para notificación por email"
             >
               {[1, 2, 3, 5, 7].map((d) => (
@@ -392,28 +577,32 @@ function DebtNotificationCard({
                 id={`whatsapp-${debt.id}`}
                 type="checkbox"
                 checked={whatsappEnabled}
-                onChange={(e) => setWhatsappEnabled(e.target.checked)}
-                disabled={!userPhone}
+                onChange={(e) => handleWhatsappToggle(e.target.checked)}
+                disabled={!userPhone || savingWhatsapp}
                 className="w-5 h-5 cursor-pointer rounded border-slate-300 text-emerald-600 focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600 dark:focus:ring-offset-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Habilitar notificaciones por WhatsApp"
               />
               <label
                 htmlFor={`whatsapp-${debt.id}`}
-                className="font-medium text-slate-900 dark:text-white cursor-pointer"
+                className="font-medium text-slate-900 dark:text-white cursor-pointer flex items-center gap-2"
               >
                 Notificación por WhatsApp
+                {savingWhatsapp && (
+                  <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                )}
               </label>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-400 ml-7">
-              {userPhone ? userPhone : "⚠️ Agregar teléfono para habilitar"}
+              {userPhone ? userPhone : "Configura tu teléfono para habilitar"}
             </p>
           </div>
 
           {whatsappEnabled && userPhone && (
             <select
               value={whatsappDays}
-              onChange={(e) => setWhatsappDays(e.target.value)}
-              className="h-9 px-3 text-sm border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent transition-all duration-200"
+              onChange={(e) => handleWhatsappDaysChange(e.target.value)}
+              disabled={savingWhatsapp}
+              className="h-9 px-3 text-sm border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Días antes para notificación por WhatsApp"
             >
               {[0, 1, 2, 3].map((d) => (
@@ -487,7 +676,12 @@ function NotificationHistory({ history }: NotificationHistoryProps) {
                         : "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
                     }`}
                   >
-                    {n.type === "EMAIL" ? "📧" : "💬"} {n.type}
+                    {n.type === "EMAIL" ? (
+                      <Mail className="w-4 h-4" />
+                    ) : (
+                      <MessageCircle className="w-4 h-4" />
+                    )}
+                    {n.type}
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -539,8 +733,13 @@ function NotificationHistory({ history }: NotificationHistoryProps) {
               </span>
             </div>
             <div className="flex gap-2 text-xs text-slate-600 dark:text-slate-400">
-              <span className="px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded">
-                {n.type === "EMAIL" ? "📧" : "💬"} {n.type}
+              <span className="px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded inline-flex items-center gap-1">
+                {n.type === "EMAIL" ? (
+                  <Mail className="w-4 h-4" />
+                ) : (
+                  <MessageCircle className="w-4 h-4" />
+                )}
+                {n.type}
               </span>
               <span className="px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded">
                 {new Date(n.createdAt).toLocaleDateString("es-CL")}
