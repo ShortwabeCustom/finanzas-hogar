@@ -4,7 +4,21 @@
 
 Sistema de control financiero personal y del hogar con importación de documentos (PDF, Excel, XML CFDI, tickets OCR).
 
-> **Estado (2026-08-05 rev6):** **INCREMENTO 3 COMPLETADO** (2026-08-05): Integración del módulo Deudas con Mis Pagos, Dashboard Personal, y Analytics. Cambios DB: relatedDebtId en PersonalPayment + BankTransaction. Mis Pagos: badges "Abono a deuda", filtro, columna linked. Dashboard: componente DebtsPendingSection con KPIs (saldo payable, próximo vencimiento, cuotas vencidas). Analytics: 10 eventos (debt_created, debt_edited, etc.) anonimizados con amount buckets. Tests E2E: 5 suites Playwright (crear→pagar→liquidar, vincular, filtros, responsive 375px, a11y WCAG AA). API actualizado: GET/POST /api/personal/payments + relatedDebtId. Build ✓ (46 routes, 0 errors). Commit `306fc16`. **PRÓXIMO: Incremento 4** — Statements UI (modal vincular), tests unitarios, notificaciones. Baseline anterior (2026-08-04 rev5): **INCREMENTO 2 COMPLETADO** Módulo "Plan de Recuperación" removido. n8n removido. WhatsApp desactivado. Pipeline OCR/PDF in-process (Santander ECB XML, Santander PDF Cuenta Corriente/Tarjeta Crédito, fallback OpenAI gpt-4o-mini). Estados de Cuenta del Hogar (`/statements`, `BankAccountScope` PERSONAL/HOUSEHOLD). Ordenamiento movimientos (FECHA/CARGO, aria-sort). Mes asignado manual en statements. Fix 504 nginx + maxDuration. Fix SVG sidebar sweep-flag. Validación PATCH statements (assignedMonth/Year/Source). Incremento 1 APIs y modelos (DebtAccount, DebtInstallment, DebtPayment, transacciones ACID, Zod validation, debt-calculations.ts).
+> **Estado (2026-08-05 rev7 — INCREMENTO 3):** 
+> - ✅ **INCREMENTO 3 COMPLETADO** (2026-08-05): Integración del módulo Deudas con Mis Pagos, Dashboard Personal, y Analytics.
+> - **Schema:** relatedDebtId FK en PersonalPayment + BankTransaction (linkedManuallyAt), índices + relaciones inversas
+> - **Mis Pagos:** Badges "Abono a deuda" (púrpura, link a deuda), filtro "Solo abonos a deudas", columna "Deuda relacionada"
+> - **Statements:** Badge "Vinculado a deuda", API POST /api/personal/debts/[id]/link-transaction lista (reutilizado Incremento 1)
+> - **Dashboard:** Componente DebtsPendingSection con 3 KPIs (Saldo payable, Próximo vencimiento con días, Cuotas vencidas en rojo), card "Deuda más urgente" con progreso, lista "Vencidas" colapsable
+> - **Analytics:** src/lib/analytics.ts con trackDebtEvent() + 10 eventos (debt_created, debt_edited, debt_deleted, debt_payment_recorded, debt_payment_edited, debt_payment_deleted, debt_marked_paid_off, debt_installment_generated, debt_transaction_linked, debt_filter_used), anonimizado (amount buckets: 0-1k, 1k-5k, 5k-20k, 20k-100k, 100k+)
+> - **Tests E2E:** tests/e2e/debts.spec.ts con 5 suites Playwright (crear→6 pagos→liquidar→PAID_OFF, vincular transacción, filtros+búsqueda, responsive 375px sin horizontal scroll, a11y WCAG AA)
+> - **API Updated:** GET/POST /api/personal/payments ± relatedDebt, GET /api/personal/dashboard con objeto debts
+> - **Build:** ✓ 46 routes, 0 errors, 0 warnings, TypeScript clean, 44s compile time
+> - **Commits:** 306fc16 (feat integration), 44fffd1 (docs)
+> - **Archivos:** +945 líneas totales. Nuevos: src/lib/analytics.ts, src/components/personal/dashboard/DebtsPendingSection.tsx, tests/e2e/debts.spec.ts
+> - **PRÓXIMO: INCREMENTO 4** — Statements UI (modal vincular transacción a deuda), Tests unitarios (debt-calculations.ts, validaciones), Notificaciones (próximo vencimiento email/WhatsApp), E2E en CI
+>
+> **Baseline anterior (2026-08-04):** INCREMENTO 2 (UI deudas) ✅ + INCREMENTO 1 (APIs/schema) ✅. Módulo Plan de Recuperación removido. OCR pipeline: Santander ECB/PDF, OpenAI gpt-5.4-mini + fallback. Estados Hogar: BankAccountScope PERSONAL/HOUSEHOLD. Fix 504 nginx.
 
 ---
 
