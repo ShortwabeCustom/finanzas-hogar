@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { validateInternalToken } from "@/lib/internalAuth";
 import { importStatement } from "@/lib/financial/import";
+import { parsePaginationParams, buildPaginatedResponse } from "@/lib/pagination";
 import type { ImportStatementPayload } from "@/types/financial";
 
 /**
@@ -45,10 +46,12 @@ export async function POST(req: NextRequest) {
 /**
  * GET /api/financial/statements
  * User-facing route (NextAuth session). Returns statements for the session
- * user, optionally filtered by accountId.
+ * user, optionally filtered by accountId, with cursor pagination.
  *
  * Query params:
  *   accountId — optional, filter by account
+ *   limit — page size (default 20, max 100)
+ *   cursor — cursor for pagination
  */
 export async function GET(req: NextRequest) {
   try {
@@ -59,11 +62,20 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const accountId = searchParams.get("accountId") ?? "";
 
+    const { limit, cursor } = parsePaginationParams(
+      searchParams.get("limit"),
+      searchParams.get("cursor")
+    );
+
     const where: any = {
       account: { userId },
     };
 
     if (accountId) where.accountId = accountId;
+
+    if (cursor) {
+      where.periodStart = { ...((where.periodStart as any) || {}), lt: new Date(cursor) };
+    }
 
     const statements = await prisma.bankStatement.findMany({
       where,
@@ -71,9 +83,12 @@ export async function GET(req: NextRequest) {
         account: true,
       },
       orderBy: { periodStart: "desc" },
+      take: limit + 1,
     });
 
-    return NextResponse.json(statements);
+    return NextResponse.json(
+      buildPaginatedResponse(statements, limit, (stmt) => stmt.periodStart.toISOString())
+    );
   } catch (error) {
     console.error("[financial/statements GET]", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });

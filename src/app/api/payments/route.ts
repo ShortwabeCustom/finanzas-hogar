@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { paymentSchema } from "@/lib/validations";
 import { generateFolio } from "@/lib/utils";
+import { parsePaginationParams, buildPaginatedResponse } from "@/lib/pagination";
 
 // Methods that require a PersonalCard association
 const CARD_METHODS = ["CREDIT_CARD", "DEBIT_CARD", "TRANSFER"];
@@ -59,6 +60,11 @@ export async function GET(req: NextRequest) {
   const from = searchParams.get("from") ?? "";
   const to = searchParams.get("to") ?? "";
 
+  const { limit, cursor } = parsePaginationParams(
+    searchParams.get("limit"),
+    searchParams.get("cursor")
+  );
+
   const where: any = {};
   if (search) {
     where.OR = [
@@ -77,13 +83,20 @@ export async function GET(req: NextRequest) {
     if (to) where.registeredAt.lte = new Date(to);
   }
 
+  if (cursor) {
+    where.registeredAt = { ...where.registeredAt, lt: new Date(cursor) };
+  }
+
   const payments = await prisma.payment.findMany({
     where,
     include: { category: true, paidBy: { select: { id: true, name: true, email: true } }, card: true },
     orderBy: { registeredAt: "desc" },
+    take: limit + 1,
   });
 
-  return NextResponse.json(payments);
+  return NextResponse.json(
+    buildPaginatedResponse(payments, limit, (payment) => payment.registeredAt.toISOString())
+  );
 }
 
 export async function POST(req: NextRequest) {

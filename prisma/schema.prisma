@@ -393,6 +393,8 @@ model BankStatement {
 
   @@unique([accountId, periodStart, periodEnd])
   @@index([accountId])
+  @@index([periodStart])
+  @@index([accountId, periodStart])
 }
 
 model BankTransaction {

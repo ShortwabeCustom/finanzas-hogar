@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { personalPaymentSchema } from "@/lib/validations";
 import { generateFolio } from "@/lib/utils";
+import { parsePaginationParams, buildPaginatedResponse } from "@/lib/pagination";
 
 const CARD_METHODS = ["CREDIT_CARD", "DEBIT_CARD", "TRANSFER"];
 
@@ -37,6 +38,11 @@ export async function GET(req: NextRequest) {
     const cardId = searchParams.get("cardId") ?? "";
     const debtId = searchParams.get("debtId") ?? "";
 
+    const { limit, cursor } = parsePaginationParams(
+      searchParams.get("limit"),
+      searchParams.get("cursor")
+    );
+
     // userId is always sourced from the session — never from the client
     const where: any = { userId };
     if (search) {
@@ -52,13 +58,20 @@ export async function GET(req: NextRequest) {
     if (cardId) where.personalCardId = cardId;
     if (debtId) where.relatedDebtId = debtId;
 
+    if (cursor) {
+      where.createdAt = { ...where.createdAt, lt: new Date(cursor) };
+    }
+
     const payments = await prisma.personalPayment.findMany({
       where,
       include: { category: true, card: true, relatedDebt: true },
       orderBy: { createdAt: "desc" },
+      take: limit + 1,
     });
 
-    return NextResponse.json(payments);
+    return NextResponse.json(
+      buildPaginatedResponse(payments, limit, (payment) => payment.createdAt.toISOString())
+    );
   } catch (error) {
     console.error("[personal/payments GET]", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
