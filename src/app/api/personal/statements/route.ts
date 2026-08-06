@@ -36,9 +36,7 @@ export async function GET(req: NextRequest) {
       take: limit + 1,
     });
 
-    return NextResponse.json(
-      buildPaginatedResponse(statements, limit, (stmt) => stmt.periodStart.toISOString())
-    );
+    return NextResponse.json(statements);
   } catch (error) {
     console.error("[personal/statements GET]", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });

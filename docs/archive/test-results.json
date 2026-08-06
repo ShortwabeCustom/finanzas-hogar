@@ -1,0 +1,396 @@
+{
+  "config": {
+    "argv": [
+      "/usr/bin/node",
+      "/var/www/finanzas-hogar/node_modules/.bin/playwright",
+      "test",
+      "tests/e2e/analytics.spec.ts",
+      "--project=chromium"
+    ],
+    "configFile": "/var/www/finanzas-hogar/playwright.config.ts",
+    "rootDir": "/var/www/finanzas-hogar/tests/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/var/www/finanzas-hogar/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/var/www/finanzas-hogar/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/var/www/finanzas-hogar/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/var/www/finanzas-hogar/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/var/www/finanzas-hogar/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/var/www/finanzas-hogar/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "html",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results.json"
+        }
+      ],
+      [
+        "github",
+        null
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": {
+      "command": "npm run dev -- -p 4100",
+      "url": "http://localhost:4100",
+      "reuseExistingServer": true
+    }
+  },
+  "suites": [
+    {
+      "title": "analytics.spec.ts",
+      "file": "analytics.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Analytics - GA4 Event Tracking",
+          "file": "analytics.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "TC-GA4-001: Google Analytics carga correctamente (gtag.js)",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 12193,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 10000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard\" until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 10000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard\" until \"load\"\n============================================================\n    at /var/www/finanzas-hogar/tests/e2e/analytics.spec.ts:24:16",
+                        "location": {
+                          "file": "/var/www/finanzas-hogar/tests/e2e/analytics.spec.ts",
+                          "column": 16,
+                          "line": 24
+                        },
+                        "snippet": "  22 |\n  23 |     // 3. Esperar a dashboard\n> 24 |     await page.waitForURL('**/dashboard', { timeout: 10000 });\n     |                ^\n  25 |\n  26 |     // 4. Esperar a que gtag se cargue\n  27 |     await page.waitForTimeout(2000);"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/var/www/finanzas-hogar/tests/e2e/analytics.spec.ts",
+                            "column": 16,
+                            "line": 24
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 10000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard\" until \"load\"\n============================================================\n\n  22 |\n  23 |     // 3. Esperar a dashboard\n> 24 |     await page.waitForURL('**/dashboard', { timeout: 10000 });\n     |                ^\n  25 |\n  26 |     // 4. Esperar a que gtag se cargue\n  27 |     await page.waitForTimeout(2000);\n    at /var/www/finanzas-hogar/tests/e2e/analytics.spec.ts:24:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-06T05:21:23.603Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/var/www/finanzas-hogar/test-results/analytics-Analytics---GA4--f7c34-arga-correctamente-gtag-js--chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/var/www/finanzas-hogar/tests/e2e/analytics.spec.ts",
+                        "column": 16,
+                        "line": 24
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "634c82c6846b68aa8d60-f7ae588d41639dcd26b0",
+              "file": "analytics.spec.ts",
+              "line": 9,
+              "column": 7
+            },
+            {
+              "title": "TC-GA4-002: Evento page_view se registra en navegación",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 11397,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [
+                        {
+                          "text": "GA4 gtag not configured - skipping event test\n"
+                        }
+                      ],
+                      "retry": 0,
+                      "startTime": "2026-08-06T05:21:38.542Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "634c82c6846b68aa8d60-8a05fad50c8a561d768c",
+              "file": "analytics.spec.ts",
+              "line": 39,
+              "column": 7
+            },
+            {
+              "title": "TC-GA4-003: Crear pago dispara evento payment_created",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 12590,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-06T05:21:50.440Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "634c82c6846b68aa8d60-09d1410b34287799471c",
+              "file": "analytics.spec.ts",
+              "line": 73,
+              "column": 7
+            },
+            {
+              "title": "TC-GA4-004: Sin errores CORS en gtag",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 16544,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-06T05:22:03.135Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "634c82c6846b68aa8d60-a14d4122959a41f6d007",
+              "file": "analytics.spec.ts",
+              "line": 130,
+              "column": 7
+            },
+            {
+              "title": "TC-GA4-005: DataLayer está disponible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5379,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-06T05:22:19.767Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "634c82c6846b68aa8d60-4bd36f8b68f361e41bfe",
+              "file": "analytics.spec.ts",
+              "line": 157,
+              "column": 7
+            },
+            {
+              "title": "TC-GA4-006: Navegación entre vistas dispara eventos",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 38681,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "/var/www/finanzas-hogar/tests/e2e/analytics.spec.ts",
+                            "column": 18,
+                            "line": 190
+                          },
+                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:4100/payments\", waiting until \"load\"\u001b[22m\n\n\n  188 |\n  189 |     for (const path of pages) {\n> 190 |       await page.goto(path);\n      |                  ^\n  191 |       await page.waitForTimeout(500);\n  192 |\n  193 |       // Verificar que no hay errores JavaScript\n    at /var/www/finanzas-hogar/tests/e2e/analytics.spec.ts:190:18"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-06T05:22:25.211Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/var/www/finanzas-hogar/test-results/analytics-Analytics---GA4--c2ef1-ntre-vistas-dispara-eventos-chromium/error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "634c82c6846b68aa8d60-aaa0f8807e4444290d8c",
+              "file": "analytics.spec.ts",
+              "line": 179,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-08-06T05:21:12.720Z",
+    "duration": 114622.459,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 2,
+    "flaky": 0
+  }
+}
