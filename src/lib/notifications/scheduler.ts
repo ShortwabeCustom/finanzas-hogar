@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NotificationService } from './notification-service';
-import { trackDebtEvent } from '@/lib/analytics';
+import { trackEvent } from '@/lib/analytics';
 
 /**
  * Process pending notifications and send them
@@ -59,7 +59,7 @@ export async function processPendingNotifications(): Promise<{ processed: number
           },
         });
 
-        trackDebtEvent('debt_notification_sent');
+        trackEvent('debt_notification_sent');
 
         processed++;
       } else {

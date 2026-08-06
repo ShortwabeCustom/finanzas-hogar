@@ -17,29 +17,25 @@ export async function GET(req: NextRequest) {
     const userId = session.user.id;
 
     // Fetch user's accounts from the database
-    const accounts = await prisma.account.findMany({
+    const accounts = await prisma.bankAccount.findMany({
       where: {
-        users: {
-          some: {
-            userId: userId,
-          },
-        },
+        userId: userId,
       },
       select: {
         id: true,
-        name: true,
+        productName: true,
         type: true,
         bankName: true,
       },
       orderBy: {
-        name: "asc",
+        productName: "asc",
       },
     });
 
     return NextResponse.json({
       data: accounts.map((account) => ({
         id: account.id,
-        name: account.name || `${account.bankName} - ${account.type}`,
+        name: account.productName || `${account.bankName} - ${account.type}`,
       })),
     });
   } catch (error) {

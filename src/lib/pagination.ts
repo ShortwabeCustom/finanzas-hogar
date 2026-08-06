@@ -4,7 +4,7 @@
  */
 
 export interface PaginationParams {
-  limit?: number;
+  limit: number;
   cursor?: string;
 }
 

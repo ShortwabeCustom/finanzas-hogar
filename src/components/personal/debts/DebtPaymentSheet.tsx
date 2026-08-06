@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import Sheet from "@/components/ui/Sheet";
 import { debtPaymentSchema } from "@/lib/validations/debt";
 import { PAYMENT_METHOD_LABELS } from "@/lib/utils";
-import { trackDebtEvent, getAmountBucket } from "@/lib/analytics";
+import { trackEvent } from "@/lib/analytics";
 import { getTodayDateInputValue } from "@/lib/forms/date-helpers";
 
 interface DebtPaymentSheetProps {
@@ -147,9 +147,8 @@ export default function DebtPaymentSheet({
 
       // Analytics tracking
       const totalPayment = Number(formData.principalAmount) + Number(formData.interestAmount) + Number(formData.feeAmount) + Number(formData.penaltyAmount);
-      trackDebtEvent('debt_payment_recorded', {
+      trackEvent('debt_payment_recorded', {
         payment_method: payload.paymentMethod as any,
-        amount_bucket: getAmountBucket(totalPayment),
         portion: Number(formData.principalAmount) > 0 ? ('capital' as const) : ('interest' as const),
       });
 

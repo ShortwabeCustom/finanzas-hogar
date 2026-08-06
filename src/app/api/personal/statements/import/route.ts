@@ -94,7 +94,7 @@ async function parseAndPreviewStatement(
       // Try credit card first
       try {
         if (isSantanderCreditPDF(pdfText) || bankType === "SANTANDER_CREDIT") {
-          const result = await parseSantanderCreditPDF(buffer);
+          const result = await parseSantanderCreditPDF(pdfText, "santander-statement.pdf");
           if (result) {
             parsed = result;
           }

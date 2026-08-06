@@ -4,7 +4,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
 import { formatCurrency } from "@/lib/utils";
-import { trackDebtEvent } from "@/lib/analytics";
+import { trackEvent } from "@/lib/analytics";
 
 interface DebtAccount {
   id: string;
@@ -126,7 +126,7 @@ export default function LinkTransactionModal({
       }
 
       // Track event
-      trackDebtEvent("debt_transaction_linked", {
+      trackEvent("debt_transaction_linked", {
         transaction_amount: totalBreakdown,
         partial: isPartial,
       });

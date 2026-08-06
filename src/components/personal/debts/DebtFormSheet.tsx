@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import Sheet from "@/components/ui/Sheet";
 import { debtFormSchema } from "@/lib/validations/debt";
 import { PERIOD_LABELS } from "@/lib/utils";
-import { trackDebtEvent, getAmountBucket } from "@/lib/analytics";
+import { trackEvent } from "@/lib/analytics";
 import { toDateInputValue, getTodayDateInputValue } from "@/lib/forms/date-helpers";
 
 interface DebtFormSheetProps {
@@ -155,15 +155,14 @@ export default function DebtFormSheet({ open, onClose, onSuccess, debtId }: Debt
 
       // Analytics tracking
       if (debtId) {
-        trackDebtEvent('debt_edited', {
+        trackEvent('debt_edited', {
           type: payload.type as any,
           field_changed: 'general', // Could be enhanced to track specific fields
         });
       } else {
-        trackDebtEvent('debt_created', {
+        trackEvent('debt_created', {
           direction: direction as any,
           type: payload.type as any,
-          amount_bucket: getAmountBucket(Number(payload.originalPrincipal)),
         });
       }
 

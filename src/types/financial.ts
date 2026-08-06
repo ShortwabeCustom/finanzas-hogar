@@ -84,4 +84,5 @@ export interface ImportSummary {
   imported: number;
   skipped: number;
   errors: string[];
+  statementId?: string;
 }

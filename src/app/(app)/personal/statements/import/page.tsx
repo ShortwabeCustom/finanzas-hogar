@@ -17,7 +17,7 @@ interface PreviewData {
     id?: string;
     date: string;
     description: string;
-    amount?: number;
+    amount: number;
     chargeAmount?: number;
     creditAmount?: number;
     type?: "debit" | "credit";
