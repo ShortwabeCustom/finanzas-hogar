@@ -12,7 +12,7 @@ export default defineConfig({
     ['github'],
   ],
   use: {
-    baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:4000',
+    baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:4100',
     trace: 'on-first-retry',
   },
   projects: [
@@ -30,8 +30,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:4000',
+    command: 'npm run dev -- -p 4100',
+    url: 'http://localhost:4100',
     reuseExistingServer: !process.env.CI,
   },
 });

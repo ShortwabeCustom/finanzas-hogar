@@ -16,9 +16,9 @@ test.describe('Analytics - GA4 Event Tracking', () => {
     });
 
     // 2. Login
-    await page.fill('input[type="email"]', 'alexis.pro_sk8@hotmail.com');
-    await page.fill('input[type="password"]', 'password');
-    await page.click('button:has-text("Entrar")');
+    await page.fill('input[type="email"]', 'alexis@hogar.com');
+    await page.fill('input[type="password"]', 'admin123');
+    await page.click('button:has-text("Iniciar sesión")');
 
     // 3. Esperar a dashboard
     await page.waitForURL('**/dashboard', { timeout: 10000 });
@@ -38,9 +38,9 @@ test.describe('Analytics - GA4 Event Tracking', () => {
 
   test('TC-GA4-002: Evento page_view se registra en navegación', async ({ page }) => {
     // 1. Login
-    await page.fill('input[type="email"]', 'alexis.pro_sk8@hotmail.com');
-    await page.fill('input[type="password"]', 'password');
-    await page.click('button:has-text("Entrar")');
+    await page.fill('input[type="email"]', 'alexis@hogar.com');
+    await page.fill('input[type="password"]', 'admin123');
+    await page.click('button:has-text("Iniciar sesión")');
     await page.waitForURL('**/dashboard', { timeout: 10000 });
 
     // 2. Verificar que gtag está disponible
@@ -72,9 +72,9 @@ test.describe('Analytics - GA4 Event Tracking', () => {
 
   test('TC-GA4-003: Crear pago dispara evento payment_created', async ({ page }) => {
     // 1. Login
-    await page.fill('input[type="email"]', 'alexis.pro_sk8@hotmail.com');
-    await page.fill('input[type="password"]', 'password');
-    await page.click('button:has-text("Entrar")');
+    await page.fill('input[type="email"]', 'alexis@hogar.com');
+    await page.fill('input[type="password"]', 'admin123');
+    await page.click('button:has-text("Iniciar sesión")');
     await page.waitForURL('**/dashboard');
 
     // 2. Monitorear eventos
@@ -139,9 +139,9 @@ test.describe('Analytics - GA4 Event Tracking', () => {
     });
 
     // 2. Login y navegar
-    await page.fill('input[type="email"]', 'alexis.pro_sk8@hotmail.com');
-    await page.fill('input[type="password"]', 'password');
-    await page.click('button:has-text("Entrar")');
+    await page.fill('input[type="email"]', 'alexis@hogar.com');
+    await page.fill('input[type="password"]', 'admin123');
+    await page.click('button:has-text("Iniciar sesión")');
     await page.waitForURL('**/dashboard');
 
     // 3. Navegar entre páginas
@@ -156,9 +156,9 @@ test.describe('Analytics - GA4 Event Tracking', () => {
 
   test('TC-GA4-005: DataLayer está disponible', async ({ page }) => {
     // 1. Login
-    await page.fill('input[type="email"]', 'alexis.pro_sk8@hotmail.com');
-    await page.fill('input[type="password"]', 'password');
-    await page.click('button:has-text("Entrar")');
+    await page.fill('input[type="email"]', 'alexis@hogar.com');
+    await page.fill('input[type="password"]', 'admin123');
+    await page.click('button:has-text("Iniciar sesión")');
     await page.waitForURL('**/dashboard');
 
     // 2. Verificar window.dataLayer
@@ -178,9 +178,9 @@ test.describe('Analytics - GA4 Event Tracking', () => {
 
   test('TC-GA4-006: Navegación entre vistas dispara eventos', async ({ page }) => {
     // 1. Login
-    await page.fill('input[type="email"]', 'alexis.pro_sk8@hotmail.com');
-    await page.fill('input[type="password"]', 'password');
-    await page.click('button:has-text("Entrar")');
+    await page.fill('input[type="email"]', 'alexis@hogar.com');
+    await page.fill('input[type="password"]', 'admin123');
+    await page.click('button:has-text("Iniciar sesión")');
     await page.waitForURL('**/dashboard');
 
     // 2. Navegar por varias páginas y verificar que no hay errores

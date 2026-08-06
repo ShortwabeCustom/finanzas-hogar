@@ -4,9 +4,9 @@ test.describe('Pagination - Cursor Based', () => {
   test.beforeEach(async ({ page }) => {
     // Login y navegar a payments
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'alexis.pro_sk8@hotmail.com');
-    await page.fill('input[type="password"]', 'password');
-    await page.click('button:has-text("Entrar")');
+    await page.fill('input[type="email"]', 'alexis@hogar.com');
+    await page.fill('input[type="password"]', 'admin123');
+    await page.click('button:has-text("Iniciar sesión")');
     await page.waitForURL('**/dashboard');
   });
 

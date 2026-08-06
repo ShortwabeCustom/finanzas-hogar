@@ -8,9 +8,9 @@ test.describe('Import Workflow - Statements', () => {
 
   test('TC-IMPORT-001: Importar estado de cuenta Santander con PDF', async ({ page }) => {
     // 1. Login
-    await page.fill('input[type="email"]', 'alexis.pro_sk8@hotmail.com');
-    await page.fill('input[type="password"]', 'password');
-    await page.click('button:has-text("Entrar")');
+    await page.fill('input[type="email"]', 'alexis@hogar.com');
+    await page.fill('input[type="password"]', 'admin123');
+    await page.click('button:has-text("Iniciar sesión")');
 
     // Esperar redirección a dashboard
     await page.waitForURL('**/dashboard', { timeout: 10000 });
@@ -59,9 +59,9 @@ test.describe('Import Workflow - Statements', () => {
 
   test('TC-IMPORT-002: Rechazar archivo inválido (> 5MB)', async ({ page }) => {
     // 1. Login
-    await page.fill('input[type="email"]', 'alexis.pro_sk8@hotmail.com');
-    await page.fill('input[type="password"]', 'password');
-    await page.click('button:has-text("Entrar")');
+    await page.fill('input[type="email"]', 'alexis@hogar.com');
+    await page.fill('input[type="password"]', 'admin123');
+    await page.click('button:has-text("Iniciar sesión")');
     await page.waitForURL('**/dashboard');
 
     // 2. Navegar a import
@@ -79,9 +79,9 @@ test.describe('Import Workflow - Statements', () => {
 
   test('TC-IMPORT-003: Validar progress bar durante procesamiento', async ({ page }) => {
     // 1. Login
-    await page.fill('input[type="email"]', 'alexis.pro_sk8@hotmail.com');
-    await page.fill('input[type="password"]', 'password');
-    await page.click('button:has-text("Entrar")');
+    await page.fill('input[type="email"]', 'alexis@hogar.com');
+    await page.fill('input[type="password"]', 'admin123');
+    await page.click('button:has-text("Iniciar sesión")');
     await page.waitForURL('**/dashboard');
 
     // 2. Navegar a import y completar paso 1
@@ -108,9 +108,9 @@ test.describe('Import Workflow - Statements', () => {
 
   test('TC-IMPORT-004: Selector de cuenta funciona correctamente', async ({ page }) => {
     // 1. Login
-    await page.fill('input[type="email"]', 'alexis.pro_sk8@hotmail.com');
-    await page.fill('input[type="password"]', 'password');
-    await page.click('button:has-text("Entrar")');
+    await page.fill('input[type="email"]', 'alexis@hogar.com');
+    await page.fill('input[type="password"]', 'admin123');
+    await page.click('button:has-text("Iniciar sesión")');
     await page.waitForURL('**/dashboard');
 
     // 2. Navegar a import, paso 1 y 2
@@ -137,9 +137,9 @@ test.describe('Import Workflow - Statements', () => {
 
   test('TC-IMPORT-005: Botones "Ver transacciones" y "Cerrar" en resultado', async ({ page }) => {
     // 1. Login completo hasta paso 4 (resultado)
-    await page.fill('input[type="email"]', 'alexis.pro_sk8@hotmail.com');
-    await page.fill('input[type="password"]', 'password');
-    await page.click('button:has-text("Entrar")');
+    await page.fill('input[type="email"]', 'alexis@hogar.com');
+    await page.fill('input[type="password"]', 'admin123');
+    await page.click('button:has-text("Iniciar sesión")');
     await page.waitForURL('**/dashboard');
 
     await page.goto('/personal/statements/import');

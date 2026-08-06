@@ -7,12 +7,12 @@ setup('authenticate', async ({ page, context }) => {
   await page.goto('/login');
 
   // Completar formulario de login
-  await page.fill('input[type="email"]', 'alexis.pro_sk8@hotmail.com');
-  await page.fill('input[type="password"]', 'password');
+  await page.fill('input[type="email"]', 'alexis@hogar.com');
+  await page.fill('input[type="password"]', 'admin123');
 
-  // Click en botón Entrar (varios selectores posibles)
+  // Click en botón Iniciar sesión (varios selectores posibles)
   try {
-    await page.click('button:has-text("Entrar")');
+    await page.click('button:has-text("Iniciar sesión")');
   } catch {
     // Si no encuentra con has-text, buscar por atributo o tipo
     const buttons = page.locator('button[type="submit"]');
