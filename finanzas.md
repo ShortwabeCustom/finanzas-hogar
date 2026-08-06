@@ -4,7 +4,15 @@
 
 Sistema de control financiero personal y del hogar con importación de documentos (PDF, Excel, XML CFDI, tickets OCR).
 
-> **Estado (2026-08-05 rev11 — INCREMENTO 4 Sesión 3 COMPLETADA):** 
+> **Estado (2026-08-06 rev12 — INCREMENTO 5 SESIÓN A COMPLETADA):** 
+> - ✅ **INCREMENTO 5 SESIÓN A COMPLETADA** (2026-08-06): Backend APIs — Paginación + Importación + Analytics
+>   - **Paginación Cursor-Based:** Implementada en GET /api/payments, /api/personal/payments, /api/personal/statements, /api/financial/statements
+>   - **Statements Import API:** POST /api/personal/statements/import (upload + parse), GET (status polling), POST /confirm (save transactions)
+>   - **Analytics Infrastructure:** src/lib/analytics.ts con trackEvent(), GA4 setup en root layout, POST /api/analytics/log para logging server-side
+>   - **Database:** Índices agregados en BankStatement para optimizar paginación
+>   - **Commits:** 3 commits (pagination, import, analytics)
+>   - **Próximo:** INCREMENTO 5 SESIÓN B — Frontend (Import wizard UI, skeleton screens, metadata dinámico)
+> 
 > - ✅ **INCREMENTO 4 Sesión 1 COMPLETADA** (2026-08-05): Statements UI — Modal para vincular transacciones a deudas.
 > - ✅ **INCREMENTO 4 Sesión 2 COMPLETADA** (2026-08-05): Tests unitarios + Notificaciones base + E2E CI
 >   - **Tests Unitarios:** Vitest configurado, 70 tests (22 debt-calculations, 24 debt-validation, 24 debt-api) con 80%+ coverage
