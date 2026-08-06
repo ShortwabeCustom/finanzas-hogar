@@ -4,14 +4,29 @@
 
 Sistema de control financiero personal y del hogar con importación de documentos (PDF, Excel, XML CFDI, tickets OCR).
 
-> **Estado (2026-08-06 rev12 — INCREMENTO 5 SESIÓN A COMPLETADA):** 
+> **Estado (2026-08-06 rev13 — INCREMENTO 5 SESIÓN B COMPLETADA):** 
+> - ✅ **INCREMENTO 5 SESIÓN B COMPLETADA** (2026-08-06): Frontend UI — Import Wizard + Skeleton Screens + Metadata
+>   - **Import Wizard (4 pasos):** 
+>     - Paso 1: BankSelector (6 bancos: Auto, Santander, BBVA, Scotiabank, BCI, Otro)
+>     - Paso 2: PdfUploadZone (drag & drop, validación 5MB, progress bar)
+>     - Paso 3: TransactionPreviewTable (tabla 10 txns, selector de cuenta, merge toggle)
+>     - Paso 4: ImportResultCard (éxito/error con count)
+>   - **Componentes Creados:** StepIndicator, BankSelector, PdfUploadZone, TransactionPreviewTable, ImportResultCard (src/components/statements/)
+>   - **Skeleton Screens:** SkeletonCard, SkeletonCardGrid, SkeletonTable (reemplazan spinners)
+>   - **Metadata Dinámico:** Titles únicos en 7 páginas (Dashboard, Payments, Categories, Personal Payments/Statements/Debts, Import)
+>   - **Sidebar:** Link agregado "Importar Estado" bajo sección Personal
+>   - **API Endpoint:** GET /api/personal/accounts — lista cuentas del usuario
+>   - **Polling Logic:** Wizard implementa polling de 500ms para preview (timeout 30s)
+>   - **Aesthetic:** Sophisticated Clarity — IBM Plex Sans, spacing generoso, transiciones suaves, sin gradientes cliché
+>   - **Archivos:** +8 componentes, 1 página, 6 layouts con metadata, 1 endpoint
+>   - **Próximo:** INCREMENTO 5 SESIÓN C — E2E Tests + QA Manual
+> 
 > - ✅ **INCREMENTO 5 SESIÓN A COMPLETADA** (2026-08-06): Backend APIs — Paginación + Importación + Analytics
->   - **Paginación Cursor-Based:** Implementada en GET /api/payments, /api/personal/payments, /api/personal/statements, /api/financial/statements
+>   - **Paginación Cursor-Based:** Implementada en GET /api/payments, /api/personal/payments, /api/statements
 >   - **Statements Import API:** POST /api/personal/statements/import (upload + parse), GET (status polling), POST /confirm (save transactions)
->   - **Analytics Infrastructure:** src/lib/analytics.ts con trackEvent(), GA4 setup en root layout, POST /api/analytics/log para logging server-side
->   - **Database:** Índices agregados en BankStatement para optimizar paginación
+>   - **Analytics Infrastructure:** src/lib/analytics.ts con trackEvent(), GA4 setup en root layout
+>   - **Database:** Índices agregados para optimizar paginación
 >   - **Commits:** 3 commits (pagination, import, analytics)
->   - **Próximo:** INCREMENTO 5 SESIÓN B — Frontend (Import wizard UI, skeleton screens, metadata dinámico)
 > 
 > - ✅ **INCREMENTO 4 Sesión 1 COMPLETADA** (2026-08-05): Statements UI — Modal para vincular transacciones a deudas.
 > - ✅ **INCREMENTO 4 Sesión 2 COMPLETADA** (2026-08-05): Tests unitarios + Notificaciones base + E2E CI
