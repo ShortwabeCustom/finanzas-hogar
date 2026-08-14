@@ -38,6 +38,7 @@ export default function PaymentsPage() {
   const fetchPayments = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
+    params.set("limit", "100");
     if (search) params.set("search", search);
     if (filterCategory) params.set("categoryId", filterCategory);
     if (filterStatus) params.set("status", filterStatus);
