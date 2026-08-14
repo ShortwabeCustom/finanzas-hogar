@@ -50,11 +50,6 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   });
   if (!payment) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
-  // Only allow access if user is creator or paid by
-  if (payment.createdById !== session.user.id && payment.paidById !== session.user.id) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-  }
-
   return NextResponse.json(payment);
 }
 
@@ -78,16 +73,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       normalizedPaidById
     );
     if (cardError) return NextResponse.json({ error: cardError }, { status: 400 });
-
-    // Verify ownership before allowing update
-    const existingPayment = await prisma.payment.findUnique({
-      where: { id },
-      select: { createdById: true, paidById: true },
-    });
-    if (!existingPayment) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-    if (existingPayment.createdById !== session.user.id && existingPayment.paidById !== session.user.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
 
     const payment = await prisma.payment.update({
       where: { id },
@@ -119,19 +104,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
-  const { id } = await params;
-  const payment = await prisma.payment.findUnique({
-    where: { id },
-    select: { createdById: true },
-  });
-  if (!payment) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-
-  // Only creator can delete, or ADMIN
-  if (payment.createdById !== session.user.id && session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Solo el creador del pago puede eliminarlo" }, { status: 403 });
+  if (session.user.role !== "ADMIN" && session.user.role !== "EDITOR") {
+    return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
 
+  const { id } = await params;
   await prisma.payment.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }

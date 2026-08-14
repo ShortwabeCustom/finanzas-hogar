@@ -51,7 +51,6 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const userId = session.user.id;
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") ?? "";
   const categoryId = searchParams.get("categoryId") ?? "";
@@ -66,48 +65,27 @@ export async function GET(req: NextRequest) {
     searchParams.get("cursor")
   );
 
-  const where: any = {
-    OR: [{ createdById: userId }, { paidById: userId }],
-  };
+  const where: any = {};
 
   if (search) {
-    where.AND = [
-      {
-        OR: [
-          { name: { contains: search, mode: "insensitive" } },
-          { concept: { contains: search, mode: "insensitive" } },
-          { folio: { contains: search, mode: "insensitive" } },
-        ],
-      },
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { concept: { contains: search, mode: "insensitive" } },
+      { folio: { contains: search, mode: "insensitive" } },
     ];
   }
-  if (categoryId) {
-    if (!where.AND) where.AND = [];
-    where.AND.push({ categoryId });
-  }
-  if (status) {
-    if (!where.AND) where.AND = [];
-    where.AND.push({ status });
-  }
-  if (paymentMethod) {
-    if (!where.AND) where.AND = [];
-    where.AND.push({ paymentMethod });
-  }
-  if (paidById) {
-    if (!where.AND) where.AND = [];
-    where.AND.push({ paidById });
-  }
+  if (categoryId) where.categoryId = categoryId;
+  if (status) where.status = status;
+  if (paymentMethod) where.paymentMethod = paymentMethod;
+  if (paidById) where.paidById = paidById;
   if (from || to) {
-    if (!where.AND) where.AND = [];
-    const dateFilter: any = {};
-    if (from) dateFilter.gte = new Date(from);
-    if (to) dateFilter.lte = new Date(to);
-    where.AND.push({ registeredAt: dateFilter });
+    where.registeredAt = {};
+    if (from) where.registeredAt.gte = new Date(from);
+    if (to) where.registeredAt.lte = new Date(to);
   }
 
   if (cursor) {
-    if (!where.AND) where.AND = [];
-    where.AND.push({ registeredAt: { lt: new Date(cursor) } });
+    where.registeredAt = { ...where.registeredAt, lt: new Date(cursor) };
   }
 
   console.log(`[payments] WHERE clause:`, JSON.stringify(where));
