@@ -66,7 +66,8 @@ model User {
 
   accounts           Account[]
   sessions           Session[]
-  payments           Payment[]
+  paymentsCreated    Payment[]         @relation("PaymentCreator")
+  paymentsPaidBy     Payment[]         @relation("PaymentPaidBy")
   pantryItems        PantryItem[]
   personalCategories PersonalCategory[]
   personalPayments   PersonalPayment[]
@@ -148,8 +149,11 @@ model Payment {
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 
+  createdById String?
+  createdBy   User?   @relation("PaymentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
   paidById String?
-  paidBy   User?   @relation(fields: [paidById], references: [id])
+  paidBy   User?   @relation("PaymentPaidBy", fields: [paidById], references: [id])
 
   personalCardId String?
   card           PersonalCard? @relation("SharedPaymentCard", fields: [personalCardId], references: [id], onDelete: SetNull)

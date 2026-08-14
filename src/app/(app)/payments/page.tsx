@@ -45,8 +45,8 @@ export default function PaymentsPage() {
     if (filterUser) params.set("paidById", filterUser);
 
     const res = await fetch(`/api/payments?${params}`);
-    const data = await res.json();
-    setPayments(Array.isArray(data) ? data : []);
+    const response = await res.json();
+    setPayments(Array.isArray(response) ? response : (response?.data || []));
     setLoading(false);
   }, [search, filterCategory, filterStatus, filterMethod, filterUser]);
 

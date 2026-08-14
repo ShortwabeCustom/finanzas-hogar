@@ -51,6 +51,7 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
+  const userId = session.user.id;
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") ?? "";
   const categoryId = searchParams.get("categoryId") ?? "";
@@ -65,34 +66,60 @@ export async function GET(req: NextRequest) {
     searchParams.get("cursor")
   );
 
-  const where: any = {};
+  const where: any = {
+    OR: [{ createdById: userId }, { paidById: userId }],
+  };
+
   if (search) {
-    where.OR = [
-      { name: { contains: search, mode: "insensitive" } },
-      { concept: { contains: search, mode: "insensitive" } },
-      { folio: { contains: search, mode: "insensitive" } },
+    where.AND = [
+      {
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { concept: { contains: search, mode: "insensitive" } },
+          { folio: { contains: search, mode: "insensitive" } },
+        ],
+      },
     ];
   }
-  if (categoryId) where.categoryId = categoryId;
-  if (status) where.status = status;
-  if (paymentMethod) where.paymentMethod = paymentMethod;
-  if (paidById) where.paidById = paidById;
+  if (categoryId) {
+    if (!where.AND) where.AND = [];
+    where.AND.push({ categoryId });
+  }
+  if (status) {
+    if (!where.AND) where.AND = [];
+    where.AND.push({ status });
+  }
+  if (paymentMethod) {
+    if (!where.AND) where.AND = [];
+    where.AND.push({ paymentMethod });
+  }
+  if (paidById) {
+    if (!where.AND) where.AND = [];
+    where.AND.push({ paidById });
+  }
   if (from || to) {
-    where.registeredAt = {};
-    if (from) where.registeredAt.gte = new Date(from);
-    if (to) where.registeredAt.lte = new Date(to);
+    if (!where.AND) where.AND = [];
+    const dateFilter: any = {};
+    if (from) dateFilter.gte = new Date(from);
+    if (to) dateFilter.lte = new Date(to);
+    where.AND.push({ registeredAt: dateFilter });
   }
 
   if (cursor) {
-    where.registeredAt = { ...where.registeredAt, lt: new Date(cursor) };
+    if (!where.AND) where.AND = [];
+    where.AND.push({ registeredAt: { lt: new Date(cursor) } });
   }
+
+  console.log(`[payments] WHERE clause:`, JSON.stringify(where));
 
   const payments = await prisma.payment.findMany({
     where,
-    include: { category: true, paidBy: { select: { id: true, name: true, email: true } }, card: true },
+    include: { category: true, createdBy: { select: { id: true, name: true, email: true } }, paidBy: { select: { id: true, name: true, email: true } }, card: true },
     orderBy: { registeredAt: "desc" },
     take: limit + 1,
   });
+
+  console.log(`[payments] Total from DB: ${payments.length}, cursor: "${cursor}", limit: ${limit}`);
 
   return NextResponse.json(
     buildPaginatedResponse(payments, limit, (payment) => payment.registeredAt.toISOString())
@@ -133,12 +160,13 @@ export async function POST(req: NextRequest) {
         period: data.period,
         status: data.status,
         paymentMethod: data.paymentMethod,
+        createdById: session.user.id,
         paidById: normalizedPaidById,
         personalCardId: resolvedCardId,
         receipt: data.receipt ?? null,
         comments: data.comments ?? null,
       },
-      include: { category: true, paidBy: { select: { id: true, name: true, email: true } }, card: true },
+      include: { category: true, createdBy: { select: { id: true, name: true, email: true } }, paidBy: { select: { id: true, name: true, email: true } }, card: true },
     });
 
     return NextResponse.json(payment, { status: 201 });

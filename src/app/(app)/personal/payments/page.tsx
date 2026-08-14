@@ -362,8 +362,8 @@ export default function PersonalPaymentsPage() {
     if (filterMethod) params.set("paymentMethod", filterMethod);
     if (filterDebtOnly) params.set("debtId", "!null"); // Filter to only payments with relatedDebtId
     const res = await fetch(`/api/personal/payments?${params}`);
-    const data = await res.json();
-    setPayments(Array.isArray(data) ? data : []);
+    const response = await res.json();
+    setPayments(Array.isArray(response) ? response : (response?.data || []));
     setLoading(false);
   }, [search, filterCategory, filterStatus, filterMethod]);
 

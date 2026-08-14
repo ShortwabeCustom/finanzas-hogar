@@ -24,18 +24,234 @@ Sistema de control financiero personal y del hogar con importación automática 
 
 ## 🗂️ Índice
 
-1. [Inicio Rápido](#inicio-rápido)
-2. [Arquitectura y Stack](#arquitectura-y-stack)
-3. [Setup y Credenciales](#setup-y-credenciales)
-4. [Base de Datos](#base-de-datos)
-5. [API Routes](#api-routes)
-6. [Librerías Internas](#librerías-internas)
-7. [Módulos y Flujos](#módulos-y-flujos)
-8. [Design System](#design-system)
-9. [Deployment y Monitoreo](#deployment-y-monitoreo)
-10. [Roadmap y Backlog](#roadmap-y-backlog)
-11. [Troubleshooting](#troubleshooting)
-12. [Historial de Cambios](#historial-de-cambios)
+1. [Estructura de Archivos](#estructura-de-archivos)
+2. [Inicio Rápido](#inicio-rápido)
+3. [Arquitectura y Stack](#arquitectura-y-stack)
+4. [Setup y Credenciales](#setup-y-credenciales)
+5. [Base de Datos](#base-de-datos)
+6. [API Routes](#api-routes)
+7. [Librerías Internas](#librerías-internas)
+8. [Módulos y Flujos](#módulos-y-flujos)
+9. [Design System](#design-system)
+10. [Deployment y Monitoreo](#deployment-y-monitoreo)
+11. [Roadmap y Backlog](#roadmap-y-backlog)
+12. [Troubleshooting](#troubleshooting)
+13. [Historial de Cambios](#historial-de-cambios)
+
+---
+
+## Estructura de Archivos
+
+### Directorio Raíz
+
+```
+/var/www/finanzas-hogar/
+├── README.md                          ← Info general del proyecto
+├── finanzas.md                        ← 📌 DOCUMENTACIÓN PRINCIPAL (este archivo)
+├── package.json                       ← Dependencias npm
+├── package-lock.json
+├── tsconfig.json                      ← Configuración TypeScript
+├── vercel.json                        ← Config Vercel/deployment
+├── next.config.js                     ← Config Next.js
+├── tailwind.config.js                 ← Config Tailwind CSS
+├── vitest.config.ts                   ← Config tests Vitest
+├── playwright.config.ts               ← Config E2E tests Playwright
+```
+
+### Directorio src/ (Código Fuente)
+
+```
+src/
+├── app/                               ← Next.js App Router
+│   ├── layout.tsx                     ← Root layout (GA4 gtag.js)
+│   ├── (auth)/login/page.tsx          ← Login page
+│   └── (app)/                         ← Protected routes
+│       ├── dashboard/page.tsx         ← Dashboard hogar
+│       ├── payments/                  ← Pagos hogar
+│       ├── categories/                ← Categorías globales
+│       ├── pantry/                    ← Despensa
+│       ├── statements/                ← Estados de cuenta hogar
+│       ├── users/                     ← Gestión usuarios (ADMIN)
+│       └── personal/                  ← Finanzas personales
+│           ├── dashboard/
+│           ├── payments/
+│           ├── categories/
+│           ├── cards/                 ← Tarjetas/cuentas
+│           ├── statements/            ← Estados de cuenta personales
+│           └── debts/                 ← Deudas y préstamos
+│
+├── app/api/                           ← API endpoints
+│   ├── auth/[...nextauth]/route.ts    ← NextAuth.js config
+│   ├── dashboard/                     ← Dashboard APIs
+│   ├── payments/                      ← Pagos hogar
+│   ├── categories/                    ← Categorías
+│   ├── pantry/                        ← Despensa
+│   ├── statements/                    ← Estados hogar
+│   ├── transactions/                  ← Transacciones hogar
+│   ├── accounts/                      ← Cuentas hogar
+│   ├── personal/                      ← APIs personales
+│   │   ├── dashboard/
+│   │   ├── payments/
+│   │   ├── categories/
+│   │   ├── cards/
+│   │   ├── statements/
+│   │   ├── debts/                     ← Deudas APIs
+│   │   ├── accounts/
+│   │   ├── transactions/
+│   │   ├── notifications/
+│   │   └── user/
+│   ├── financial/                     ← Finanzas avanzadas
+│   │   ├── transactions/
+│   │   └── sync/
+│   ├── internal/                      ← Rutas internas (token auth)
+│   │   ├── payments/
+│   │   ├── upload/
+│   │   └── categories/
+│   ├── upload/                        ← Upload de comprobantes
+│   ├── receipt/[file]/route.ts        ← Servir comprobantes
+│   ├── cron/                          ← Vercel Cron jobs
+│   │   └── send-debt-notifications/
+│   └── users/                         ← Gestión usuarios
+│
+├── components/                        ← React components
+│   ├── layout/                        ← Layout components
+│   │   ├── Header.tsx
+│   │   ├── Sidebar.tsx
+│   │   └── Footer.tsx
+│   ├── statements/                    ← Import Wizard components
+│   │   ├── StatementImportCard.tsx
+│   │   ├── StepIndicator.tsx
+│   │   ├── BankSelector.tsx
+│   │   ├── PdfUploadZone.tsx
+│   │   ├── TransactionPreviewTable.tsx
+│   │   └── ImportResultCard.tsx
+│   ├── dashboard/                     ← Dashboard components
+│   ├── payments/                      ← Payment components
+│   ├── debts/                         ← Debts module components
+│   ├── ui/                            ← Reusable UI components
+│   │   ├── Button.tsx
+│   │   ├── Sheet.tsx
+│   │   ├── Dialog.tsx
+│   │   ├── ConfirmDialog.tsx
+│   │   ├── Skeleton.tsx
+│   │   └── (más componentes)
+│   └── (otros componentes)
+│
+├── lib/                               ← Librerías internas
+│   ├── prisma.ts                      ← PrismaClient singleton
+│   ├── auth.ts                        ← NextAuth config
+│   ├── internalAuth.ts                ← Validación token interno
+│   ├── utils.ts                       ← Utilidades (folio, formatters)
+│   ├── validations.ts                 ← Schemas Zod
+│   ├── analytics.ts                   ← GA4 tracking
+│   ├── dashboard-utils.ts             ← Dashboard helpers
+│   ├── category-visuals.tsx           ← Íconos y colores
+│   ├── receipt.ts                     ← URL resolution
+│   ├── productMetrics.ts              ← Métricas despensa
+│   ├── financial/                     ← Módulo importación
+│   │   ├── import.ts                  ← Importar estados
+│   │   ├── sync.ts                    ← Sync a PersonalPayment
+│   │   ├── credit-card-calendar.ts    ← Calendario crédito
+│   │   ├── debt-calculations.ts       ← Cálculos deudas
+│   │   └── parsers/                   ← Parsers de documentos
+│   │       ├── santander-ecb.ts       ← XML CFDI-ECB
+│   │       ├── santander-pdf.ts       ← PDF Checking/Nómina
+│   │       ├── santander-credit-pdf.ts ← PDF Tarjetas
+│   │       ├── vision-ocr.ts          ← OpenAI Vision OCR
+│   │       └── ai-fallback.ts         ← Fallback texto legacy
+│   └── (más librerías)
+```
+
+### Directorio prisma/ (Base de Datos)
+
+```
+prisma/
+├── schema.prisma                      ← Schema Prisma (modelos, enums, relaciones)
+└── migrations/                        ← Migraciones versionadas
+    ├── migration_lock.toml
+    └── [timestamp]_[nombre]/
+        └── migration.sql
+```
+
+### Directorio tests/ (Testing)
+
+```
+tests/
+├── e2e/                               ← E2E tests (Playwright)
+│   ├── auth.setup.ts                  ← Authentication fixture
+│   ├── import-statements.spec.ts      ← Import workflow (5 tests)
+│   ├── pagination.spec.ts             ← Cursor-based pagination (6 tests)
+│   └── analytics.spec.ts              ← GA4 tracking (6 tests)
+├── unit/                              ← Unit tests (Vitest)
+│   ├── debt-calculations.test.ts
+│   ├── debt-validation.test.ts
+│   └── debt-api.test.ts
+└── fixtures/                          ← Test data
+    └── sample-santander-checking.pdf  ← Mock PDF (42 txns)
+```
+
+### Directorio public/ (Assets Estáticos)
+
+```
+public/
+├── favicon.ico
+└── (íconos, imágenes estáticas)
+```
+
+### Directorio docs/ (Documentación)
+
+```
+docs/                                 ← Documentación activa (reutilizable)
+├── PRODUCTION_MONITORING_RUNBOOK.md   ← Comandos monitoreo 72h
+├── PRODUCTION_VALIDATION_SCREENSHOTS.md ← Guía validación manual
+├── QA_CHECKLIST_INCREMENTO_5.md       ← Template QA (62 items)
+├── RELEASE_5.0.md                     ← Release notes v5.0
+├── SKILL_GUIDE_POR_INCREMENTO.md      ← Matriz de skills
+└── archive/                           ← Documentación histórica (no se usa)
+    ├── INCREMENTO_3_SESION_SIGUIENTE.md
+    ├── INCREMENTO_4_*.md              ← Prompts de sesiones
+    ├── INCREMENTO_5_*.md
+    ├── INCREMENTO_6_MASTER_PROMPT.md
+    ├── QUICK_REFERENCE.md
+    ├── QA_E2E_TEST_ANALYSIS.md
+    ├── QA_E2E_TEST_RESULTS.md
+    ├── ACCESSIBILITY_GUIDE_INCREMENTO_5C.md
+    ├── debts-loans.md
+    ├── test-results/                  ← Resultados tests históricos
+    │   └── (artifacts de Playwright)
+    ├── test-results.json
+    └── README.md                      ← Índice del archive
+```
+
+### Directorios de Configuración
+
+```
+.github/
+├── workflows/
+│   └── e2e.yml                        ← GitHub Actions para E2E tests
+
+.next/                                 ← Build cache (gitignored)
+
+node_modules/                          ← Dependencies (gitignored)
+
+.env                                   ← Variables de entorno (gitignored)
+.env.example                           ← Ejemplo de .env
+.gitignore
+```
+
+### Resumen de Estructura
+
+| Ubicación | Propósito | Descripción |
+|-----------|-----------|-------------|
+| `/src/app` | Rutas & Páginas | Next.js App Router |
+| `/src/app/api` | APIs REST | 30+ endpoints (Hogar, Personal, Deudas) |
+| `/src/components` | React UI | Componentes reutilizables |
+| `/src/lib` | Lógica compartida | Parsers, auth, utils, cálculos |
+| `/src/lib/financial` | Importación estados | Parsers in-process + OpenAI fallback |
+| `/prisma` | BD Schema | Modelos Prisma, migraciones |
+| `/tests` | Testing | E2E (Playwright) + Unit (Vitest) |
+| `/docs` | Documentación | Activa + histórico archivado |
+| `/public` | Assets estáticos | Imágenes, favicons |
 
 ---
 

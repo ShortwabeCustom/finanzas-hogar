@@ -46,9 +46,15 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const payment = await prisma.payment.findUnique({
     where: { id },
-    include: { category: true, paidBy: { select: { id: true, name: true, email: true } }, card: true },
+    include: { category: true, createdBy: { select: { id: true, name: true, email: true } }, paidBy: { select: { id: true, name: true, email: true } }, card: true },
   });
   if (!payment) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
+  // Only allow access if user is creator or paid by
+  if (payment.createdById !== session.user.id && payment.paidById !== session.user.id) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
   return NextResponse.json(payment);
 }
 
@@ -73,6 +79,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     );
     if (cardError) return NextResponse.json({ error: cardError }, { status: 400 });
 
+    // Verify ownership before allowing update
+    const existingPayment = await prisma.payment.findUnique({
+      where: { id },
+      select: { createdById: true, paidById: true },
+    });
+    if (!existingPayment) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+    if (existingPayment.createdById !== session.user.id && existingPayment.paidById !== session.user.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
     const payment = await prisma.payment.update({
       where: { id },
       data: {
@@ -90,7 +106,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         receipt: data.receipt ?? null,
         comments: data.comments ?? null,
       },
-      include: { category: true, paidBy: { select: { id: true, name: true, email: true } }, card: true },
+      include: { category: true, createdBy: { select: { id: true, name: true, email: true } }, paidBy: { select: { id: true, name: true, email: true } }, card: true },
     });
 
     return NextResponse.json(payment);
@@ -103,9 +119,19 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  if (session.user.role !== "ADMIN") return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
 
   const { id } = await params;
+  const payment = await prisma.payment.findUnique({
+    where: { id },
+    select: { createdById: true },
+  });
+  if (!payment) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
+  // Only creator can delete, or ADMIN
+  if (payment.createdById !== session.user.id && session.user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Solo el creador del pago puede eliminarlo" }, { status: 403 });
+  }
+
   await prisma.payment.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }
