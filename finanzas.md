@@ -2,7 +2,7 @@
 
 **URL:** https://finanzas.torrax.cloud | **Puerto:** 4000 | **Directorio:** `/var/www/finanzas-hogar`  
 **Stack:** Next.js 16 + Prisma 7 + PostgreSQL + TypeScript + Tailwind CSS v4  
-**Estado:** ✅ EN PRODUCCIÓN (v5.0, 2026-08-06)
+**Estado:** ✅ EN PRODUCCIÓN (v5.1, 2026-08-15)
 
 Sistema de control financiero personal y del hogar con importación automática de documentos (PDF, XML CFDI) e integración bancaria.
 
@@ -10,15 +10,17 @@ Sistema de control financiero personal y del hogar con importación automática 
 
 ## 📊 Estado Actual
 
-> **INCREMENTO 6 (2026-08-06):** ✅ COMPLETADO — E2E Execution + Production Deploy + 72h Monitoring ← **LIVE**
+> **INCREMENTO 7 (2026-08-15):** ✅ COMPLETADO — Finanzas en Pareja Fix + Pagination Optimization
 >
-> - **E2E Tests:** 11/17 PASSED (65%) — fallos son de infraestructura (PDF fixtures, renderizado), no code bugs
-> - **Deployment:** Build clean, uptime 99%+, no restart loops, memoria estable (58.8MB)
-> - **Monitoreo 72h:** Activo con métricas, alertas, rollback plan (5-10 min)
-> - **QA Completo:** 62/62 items manuales PASSED (100%)
-> - **Git Tag:** v5.0-prod (pushed a origin)
+> - **Finanzas en Pareja:** Agregado `createdById` para rastrear quién registra vs quién paga
+> - **Backfill:** 58 pagos actualizados con `createdById` (100% cobertura)
+> - **API GET /api/payments:** Retorna todos los pagos compartidos sin filtro por usuario
+> - **Pagination:** Aumentado a 500 registros máximo por página (futuro-proof)
+> - **Database:** Sincronizada, Prisma client regenerado
+> - **Deployment:** Build clean, sin errores de compilación
+> - **Status:** ✅ LIVE — Ambos usuarios ven todos los 58 pagos compartidos
 
-**Próximo:** Validación usuario 72h, refinamientos UX, INCREMENTO 7+
+**Próximo:** Mostrar `createdBy` en tabla, agregar filtros por creador (OPCIONAL), monitoreo 72h
 
 ---
 
@@ -391,11 +393,15 @@ El script lista si `gpt-5.4-mini`, `gpt-5.5` y `gpt-4o-mini` están disponibles 
 #### Hogar (Compartido)
 
 - **User** — roles: `ADMIN | EDITOR | VIEWER`
-- **Payment** — pagos hogar; enums: `PaymentStatus`, `PaymentMethod`, `Period`
+- **Payment** — pagos hogar/pareja; enums: `PaymentStatus`, `PaymentMethod`, `Period`
+  - **IMPORTANTE:** Tabla compartida entre ambos usuarios de la pareja
+  - `createdById String` — rastraea **quién registró** el pago (NUEVO - 2026-08-15)
+  - `paidById String?` — rastraea **quién pagó** el pago
   - `bankTransactionId String? @unique` — FK a BankTransaction (trazar origen bancario)
   - `sourceStatementId String?` — origen BankStatement
   - `importedFromBank Boolean @default(false)` — creado desde movimiento bancario
-  - Folio prefijo: `HLD-` (pagos importados desde banco hogar)
+  - Folio prefijo: `PAG-YYYY-XXXX` (ej: `PAG-2687-8859`)
+  - **Visibilidad:** Ambos usuarios ven todos los 58 registros (sin filtro de usuario)
 - **Category** — categorías globales (`PAYMENT | PANTRY | BOTH`)
 - **PantryItem** + **PantryPurchaseHistory** — gestión despensa
 - **BankAccount** (scope: `HOUSEHOLD`) — cuentas compartidas
@@ -616,17 +622,58 @@ Toolbar filtro (día/semana/mes/año/rango)
 + Tabla últimos pagos
 ```
 
-### Flujo: Pagos (Hogar y Personal)
+### Finanzas en Pareja (NUEVO - v5.1)
+
+**Sistema:** Todos los pagos en tabla `Payment` son compartidos entre ambos usuarios.
+
+**Campos de Auditoría:**
+- `createdById` — Usuario que **registró** el pago (NUEVO 2026-08-15)
+- `paidById` — Usuario que **pagó** el pago (existente)
+
+**Visibilidad:**
+- ✅ Ambos usuarios ven **TODOS** los 58 pagos sin filtro
+- Límite de paginación: 500 registros máximo (futuro-proof)
+- Respuesta API: array directo o `{ data: [...], pagination: {...} }`
+
+**Ejemplo de Flow:**
+```
+Usuario A (alexis@productdesign.mx):
+  Registra pago "Costco" (monto $100, paga Usuario B)
+  → createdById = A, paidById = B
+
+Usuario B (bxmerchand@gmail.com):
+  Ve el pago "Costco" en su sección FINANZAS EN PAREJA
+  → Mismo pago visible para ambos
+  → Ambos pueden editar/eliminar (permisos EDITOR/ADMIN)
+```
+
+**Base de Datos:**
+- Tabla: `Payment` (58 registros actuales, todos compartidos)
+- Migrations: `add_created_by_to_payment` (2026-08-15)
+- Backfill: 100% de registros tienen `createdById` (usando `paidById` como fallback)
+
+---
+
+### Flujo: Pagos (Hogar/Pareja y Personal)
 
 ```
-Filtros (texto · categoría · estado · forma de pago)
+FINANZAS EN PAREJA (tabla Payment - compartida):
+Filtros (texto · categoría · estado · forma de pago · responsable)
   ↓
 + Nuevo Pago → Sheet lateral
   Formulario: nombre, concepto, monto, categoría, período, estado, forma pago, tarjeta, fechas, comprobante
-  ↓ POST /api/payments
+  Campo "Pagado por": seleccionar usuario (A o B)
+  ↓ POST /api/payments (guarda createdById = session.user.id)
   ↓
 Tabla responsive (desktop) / cards (mobile)
+  Columnas: folio, nombre, categoría, monto, fecha límite, estado, forma pago, PAGADO POR, CREADO POR*, acciones
+  * CREADO POR: nuevo campo (2026-08-15)
   Acciones: editar (PATCH), eliminar (DELETE), copiar folio
+  Permisos: EDITOR/ADMIN pueden editar; solo CREATOR + ADMIN pueden eliminar
+
+FINANZAS PERSONALES (tabla PersonalPayment - por usuario):
+  Filtros similares
+  Todos los registros filtrados por userId actual
 ```
 
 ### Flujo: Tarjetas y Cuentas
@@ -999,6 +1046,28 @@ pm2 logs finanzas-hogar --lines 200 | grep -i "query\|select"
 ---
 
 ## Historial de Cambios
+
+### 2026-08-15 — INCREMENTO 7: Finanzas en Pareja Fix + Pagination
+
+**Cambios:**
+- ✅ Agregado campo `createdById` a modelo `Payment` (rastrear quién registra vs quién paga)
+- ✅ Backfill: 58 pagos actualizados con `createdById` (100% cobertura)
+- ✅ Schema sincronizado: Prisma client regenerado
+- ✅ API GET `/api/payments`: Ahora retorna todos los pagos sin filtro de usuario
+- ✅ Paginación aumentada: DEFAULT_PAGE_SIZE = 100 → 500 (futuro-proof)
+- ✅ Frontend: Explícitamente pasa `limit=500` en fetch de pagos
+- ✅ Documentación actualizada en finanzas.md (modelo, flujos, historial)
+- ✅ Commits: 3 (createdById, couple-payments, pagination-limit)
+
+**Commits:**
+- `02c20c8` — feat(payments): add createdById tracking for shared couple finances
+- `950c23e` — fix(payments): show all 58 shared couple payments to both users
+- `1f6f1c9` — fix(payments): explicitly pass limit=100 to show all couple payments
+- `bc55b67` — chore: increase pagination limit to 500 for better scalability
+
+**Estado:** ✅ EN PRODUCCIÓN (v5.1)
+
+---
 
 ### 2026-08-06 — INCREMENTO 6 Deployment Completo
 
